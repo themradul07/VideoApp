@@ -91,13 +91,38 @@ export default function MeetingRoom() {
 
       {/* Video Grid */}
       <main className="flex-1 p-2 md:p-4 overflow-hidden">
-        <div className="grid gap-2 md:gap-4 h-full" style={{
+        {/* Mobile: Column layout */}
+        <div className="flex flex-col gap-2 h-full md:hidden overflow-y-auto">
+          {/* Local video */}
+          <VideoTile
+            stream={localStream}
+            participantName={userSettings?.displayName || 'You'}
+            isLocal={true}
+            cameraEnabled={cameraEnabled}
+            micEnabled={micEnabled}
+          />
+          
+          {/* Remote videos */}
+          {participants.map((participant) => (
+            <VideoTile
+              key={participant.id}
+              stream={participant.stream}
+              participantName={participant.name}
+              isLocal={false}
+              cameraEnabled={participant.cameraEnabled}
+              micEnabled={participant.micEnabled}
+            />
+          ))}
+        </div>
+
+        {/* Laptop/Desktop: Grid layout */}
+        <div className="hidden md:grid gap-4 h-full auto-rows-fr" style={{
           gridTemplateColumns: participants.length === 0 ? '1fr' : 
-                              participants.length === 1 ? 'repeat(1, 1fr)' :
+                              participants.length === 1 ? 'repeat(2, 1fr)' :
                               participants.length === 2 ? 'repeat(2, 1fr)' :
                               participants.length <= 4 ? 'repeat(2, 1fr)' :
-                              'repeat(3, 1fr)',
-          gridTemplateRows: participants.length <= 2 ? '1fr' : 'repeat(2, 1fr)'
+                              participants.length <= 8 ? 'repeat(3, 1fr)' :
+                              'repeat(4, 1fr)'
         }}>
           {/* Local video */}
           <VideoTile

@@ -38,7 +38,7 @@ export default function VideoTile({
   };
 
   return (
-    <div className="relative bg-gray-800 rounded-lg overflow-hidden aspect-video border border-gray-700/50">
+    <div className="relative bg-gray-800 rounded-lg overflow-hidden aspect-video border border-gray-700/50 min-h-0 md:min-h-[200px]">
       {stream && cameraEnabled ? (
         <video
           ref={videoRef}
