@@ -7,8 +7,7 @@ import { useToast } from "@/hooks/use-toast";
 import VideoTile from "@/components/VideoTile";
 import MeetingControls from "@/components/MeetingControls";
 import InviteModal from "@/components/InviteModal";
-import { useWebRTC } from "@/hooks/useWebRTC";
-import { useSocket } from "@/hooks/useSocket";
+import { useSimpleWebRTC } from "@/hooks/useSimpleWebRTC";
 
 export default function MeetingRoom() {
   const params = useParams();
@@ -16,7 +15,6 @@ export default function MeetingRoom() {
   const { toast } = useToast();
   const [showInviteModal, setShowInviteModal] = useState(false);
   const [userSettings, setUserSettings] = useState<any>(null);
-  const [participants, setParticipants] = useState<any[]>([]);
 
   const meetingId = params.meetingId;
 
@@ -37,48 +35,8 @@ export default function MeetingRoom() {
     enabled: !!meetingId,
   });
 
-  // Initialize WebRTC and Socket connections
-  const { localStream, remoteStreams, toggleCamera, toggleMicrophone, endCall } = useWebRTC(meetingId!);
-  const { socket } = useSocket(meetingId!, userSettings);
-
-  // Handle socket events
-  useEffect(() => {
-    if (!socket) return;
-
-    socket.addEventListener('message', (event) => {
-      const data = JSON.parse(event.data);
-      
-      switch (data.type) {
-        case 'participant-joined':
-          setParticipants(prev => [...prev, data.participant]);
-          toast({
-            title: "Participant joined",
-            description: `${data.participant.name} joined the meeting`,
-          });
-          break;
-          
-        case 'participant-left':
-          setParticipants(prev => prev.filter(p => p.id !== data.participantId));
-          toast({
-            title: "Participant left",
-            description: "A participant left the meeting",
-          });
-          break;
-          
-        case 'room-participants':
-          setParticipants(data.participants);
-          break;
-          
-        case 'meeting-ended':
-          toast({
-            title: "Meeting ended",
-            description: "The meeting has been ended by the host",
-          });
-          setLocation('/');
-          break;
-      }
-    });
-  }, [socket, toast, setLocation]);
+  // Initialize WebRTC connection
+  const { localStream, participants, cameraEnabled, micEnabled, toggleCamera, toggleMicrophone, endCall } = useSimpleWebRTC(meetingId!, userSettings);
 
   const handleEndCall = () => {
     endCall();
@@ -110,48 +68,51 @@ export default function MeetingRoom() {
   return (
     <div className="h-screen bg-gray-900 flex flex-col">
       {/* Header */}
-      <header className="bg-gray-800 border-b border-gray-700 p-4 flex items-center justify-between">
-        <div className="flex items-center space-x-4">
-          <h1 className="text-lg font-semibold text-white">VideoMeet</h1>
-          <span className="text-gray-400 text-sm">Meeting ID: {meetingId}</span>
+      <header className="bg-gray-800/90 backdrop-blur-sm border-b border-gray-700/50 p-3 md:p-4 flex items-center justify-between">
+        <div className="flex items-center space-x-2 md:space-x-4">
+          <h1 className="text-base md:text-lg font-semibold text-white">VideoMeet</h1>
+          <span className="text-gray-400 text-xs md:text-sm hidden sm:block">Meeting ID: {meetingId}</span>
         </div>
-        <div className="flex items-center space-x-2">
+        <div className="flex items-center space-x-1 md:space-x-2">
           <Button
             onClick={() => setShowInviteModal(true)}
-            className="bg-blue-600 hover:bg-blue-700 text-white"
+            className="bg-blue-600 hover:bg-blue-700 text-white text-xs md:text-sm px-2 md:px-4 py-1 md:py-2"
           >
-            <Share className="mr-2 h-4 w-4" />
-            Share
+            <Share className="mr-1 md:mr-2 h-3 md:h-4 w-3 md:w-4" />
+            <span className="hidden sm:inline">Share</span>
           </Button>
-          <div className="text-gray-400 text-sm flex items-center">
-            <Users className="mr-1 h-4 w-4" />
-            {participants.length + 1} participants
+          <div className="text-gray-400 text-xs md:text-sm flex items-center">
+            <Users className="mr-1 h-3 md:h-4 w-3 md:w-4" />
+            <span className="hidden sm:inline">{participants.length + 1} participants</span>
+            <span className="sm:hidden">{participants.length + 1}</span>
           </div>
         </div>
       </header>
 
       {/* Video Grid */}
-      <main className="flex-1 p-4 overflow-hidden">
-        <div className="grid gap-4 h-full" style={{
+      <main className="flex-1 p-2 md:p-4 overflow-hidden">
+        <div className="grid gap-2 md:gap-4 h-full" style={{
           gridTemplateColumns: participants.length === 0 ? '1fr' : 
-                              participants.length === 1 ? 'repeat(2, 1fr)' :
-                              participants.length <= 3 ? 'repeat(2, 1fr)' :
-                              'repeat(3, 1fr)'
+                              participants.length === 1 ? 'repeat(1, 1fr)' :
+                              participants.length === 2 ? 'repeat(2, 1fr)' :
+                              participants.length <= 4 ? 'repeat(2, 1fr)' :
+                              'repeat(3, 1fr)',
+          gridTemplateRows: participants.length <= 2 ? '1fr' : 'repeat(2, 1fr)'
         }}>
           {/* Local video */}
           <VideoTile
             stream={localStream}
             participantName={userSettings?.displayName || 'You'}
             isLocal={true}
-            cameraEnabled={userSettings?.cameraEnabled}
-            micEnabled={userSettings?.micEnabled}
+            cameraEnabled={cameraEnabled}
+            micEnabled={micEnabled}
           />
           
           {/* Remote videos */}
           {participants.map((participant) => (
             <VideoTile
               key={participant.id}
-              stream={remoteStreams[participant.id]}
+              stream={participant.stream}
               participantName={participant.name}
               isLocal={false}
               cameraEnabled={participant.cameraEnabled}

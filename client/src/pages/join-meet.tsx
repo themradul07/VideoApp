@@ -96,11 +96,11 @@ export default function JoinMeet() {
   };
 
   return (
-    <div className="grid-bg min-h-screen flex items-center justify-center p-4">
-      <Card className="w-full max-w-md bg-gray-900 border-gray-700">
+    <div className="gradient-bg min-h-screen flex items-center justify-center p-4">
+      <Card className="w-full max-w-md bg-white/10 backdrop-blur-sm border-white/20">
         <CardHeader className="text-center">
-          <CardTitle className="text-white text-2xl">Join a Meeting</CardTitle>
-          <CardDescription className="text-gray-400">
+          <CardTitle className="text-white text-xl md:text-2xl">Join a Meeting</CardTitle>
+          <CardDescription className="text-white/80">
             Enter your name to join the video call and connect with your team, clients, or friends.
           </CardDescription>
         </CardHeader>
@@ -115,7 +115,7 @@ export default function JoinMeet() {
                 placeholder="Enter meeting code"
                 value={meetingCode}
                 onChange={(e) => setMeetingCode(e.target.value)}
-                className="bg-gray-800 border-gray-600 text-white placeholder-gray-400"
+                className="bg-white/20 border-white/30 text-white placeholder-white/60"
                 required
               />
             </div>
@@ -128,7 +128,7 @@ export default function JoinMeet() {
                 placeholder="Enter your display name"
                 value={displayName}
                 onChange={(e) => setDisplayName(e.target.value)}
-                className="bg-gray-800 border-gray-600 text-white placeholder-gray-400"
+                className="bg-white/20 border-white/30 text-white placeholder-white/60"
                 required
               />
             </div>
@@ -136,7 +136,7 @@ export default function JoinMeet() {
             <div className="space-y-4">
               <div className="flex items-center justify-between">
                 <div className="flex items-center space-x-2">
-                  <Video className="h-4 w-4 text-gray-400" />
+                  <Video className="h-4 w-4 text-white/80" />
                   <Label htmlFor="camera" className="text-white">Camera</Label>
                 </div>
                 <Switch
@@ -148,7 +148,7 @@ export default function JoinMeet() {
               
               <div className="flex items-center justify-between">
                 <div className="flex items-center space-x-2">
-                  <Mic className="h-4 w-4 text-gray-400" />
+                  <Mic className="h-4 w-4 text-white/80" />
                   <Label htmlFor="microphone" className="text-white">Microphone</Label>
                 </div>
                 <Switch
@@ -161,7 +161,7 @@ export default function JoinMeet() {
             
             <Button 
               type="submit" 
-              className="w-full bg-blue-600 hover:bg-blue-700 text-white"
+              className="w-full bg-white/20 hover:bg-white/30 text-white border border-white/30"
               disabled={joinMeetingMutation.isPending}
             >
               {joinMeetingMutation.isPending ? "Joining..." : "Join Now"}
@@ -170,7 +170,7 @@ export default function JoinMeet() {
           
           <Button 
             variant="ghost" 
-            className="w-full mt-4 text-gray-400 hover:text-white"
+            className="w-full mt-4 text-white/80 hover:text-white"
             onClick={() => setLocation("/")}
           >
             <ArrowLeft className="mr-2 h-4 w-4" />

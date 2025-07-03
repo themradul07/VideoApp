@@ -29,6 +29,15 @@ export class WebRTCManager {
 
     this.socket.onopen = () => {
       console.log("WebRTC WebSocket connected");
+      // Join the room to start receiving peer events
+      if (this.socket) {
+        this.socket.send(JSON.stringify({
+          type: 'join-room',
+          meetingId: this.meetingId,
+          participantId: `webrtc-${Math.random().toString(36).substr(2, 9)}`,
+          participantName: 'WebRTC Client'
+        }));
+      }
     };
 
     this.socket.onmessage = (event) => {

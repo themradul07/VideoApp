@@ -13,30 +13,23 @@ export function useWebRTC(meetingId: string) {
 
     const initWebRTC = async () => {
       try {
+        // Get user settings for initial camera/mic state
+        const userSettings = JSON.parse(localStorage.getItem('videoMeetUser') || '{}');
+        
         const stream = await navigator.mediaDevices.getUserMedia({
-          video: true,
-          audio: true
+          video: userSettings.cameraEnabled !== false,
+          audio: userSettings.micEnabled !== false
         });
+        
+        // Set initial states based on user settings
+        setCameraEnabled(userSettings.cameraEnabled !== false);
+        setMicEnabled(userSettings.micEnabled !== false);
         
         setLocalStream(stream);
         
-        const manager = new WebRTCManager(meetingId, stream);
-        webrtcManagerRef.current = manager;
-        
-        manager.on('remoteStream', (participantId: string, stream: MediaStream) => {
-          setRemoteStreams(prev => ({
-            ...prev,
-            [participantId]: stream
-          }));
-        });
-        
-        manager.on('participantLeft', (participantId: string) => {
-          setRemoteStreams(prev => {
-            const newStreams = { ...prev };
-            delete newStreams[participantId];
-            return newStreams;
-          });
-        });
+        // Don't create WebRTCManager here as it conflicts with the main socket
+        // We'll handle WebRTC signaling through the main socket connection
+        console.log('Local stream initialized:', stream);
         
       } catch (error) {
         console.error("Error initializing WebRTC:", error);
@@ -46,9 +39,6 @@ export function useWebRTC(meetingId: string) {
     initWebRTC();
 
     return () => {
-      if (webrtcManagerRef.current) {
-        webrtcManagerRef.current.cleanup();
-      }
       if (localStream) {
         localStream.getTracks().forEach(track => track.stop());
       }
@@ -61,6 +51,11 @@ export function useWebRTC(meetingId: string) {
       if (videoTrack) {
         videoTrack.enabled = !videoTrack.enabled;
         setCameraEnabled(videoTrack.enabled);
+        
+        // Update localStorage
+        const userSettings = JSON.parse(localStorage.getItem('videoMeetUser') || '{}');
+        userSettings.cameraEnabled = videoTrack.enabled;
+        localStorage.setItem('videoMeetUser', JSON.stringify(userSettings));
       }
     }
   };
@@ -71,14 +66,16 @@ export function useWebRTC(meetingId: string) {
       if (audioTrack) {
         audioTrack.enabled = !audioTrack.enabled;
         setMicEnabled(audioTrack.enabled);
+        
+        // Update localStorage
+        const userSettings = JSON.parse(localStorage.getItem('videoMeetUser') || '{}');
+        userSettings.micEnabled = audioTrack.enabled;
+        localStorage.setItem('videoMeetUser', JSON.stringify(userSettings));
       }
     }
   };
 
   const endCall = () => {
-    if (webrtcManagerRef.current) {
-      webrtcManagerRef.current.cleanup();
-    }
     if (localStream) {
       localStream.getTracks().forEach(track => track.stop());
     }
