@@ -113,11 +113,16 @@ export function useSimpleWebRTC(meetingId: string, userSettings: any) {
     };
   }, [meetingId, userSettings]);
 
-  const createPeerConnection = async (participantId: string, stream: MediaStream, ws: WebSocket, initiator: boolean) => {
+const createPeerConnection = async (participantId: string, stream: MediaStream, ws: WebSocket, initiator: boolean) => {
     const pc = new RTCPeerConnection({
       iceServers: [
         { urls: 'stun:stun.l.google.com:19302' },
-        { urls: 'stun:stun1.l.google.com:19302' }
+        { urls: 'stun:stun1.l.google.com:19302' },
+        { urls: 'stun:stun2.l.google.com:3478' },
+        { urls: 'tcp://0.tcp.in.ngrok.io:12035?transport=tcp',
+            username: 'testuser',
+            credential: 'testpassword'
+        },
       ]
     });
 

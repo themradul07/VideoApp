@@ -60,9 +60,17 @@ app.use((req, res, next) => {
   const port = process.env.PORT || 5000;
   server.listen({
     port,
-    host: "0.0.0.0",
+    // host: "0.0.0.0",
+    host: "localhost",
     reusePort: true,
   }, () => {
     log(`serving on port ${port}`);
+
+
   });
+
+//   server.listen(5000, '127.0.0.1', () => {
+//   console.log('Server running...');
+// });
+
 })();
