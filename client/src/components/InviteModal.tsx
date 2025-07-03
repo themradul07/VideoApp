@@ -52,9 +52,7 @@ export default function InviteModal({ isOpen, onClose, meetingId }: InviteModalP
         <DialogHeader>
           <DialogTitle className="flex items-center justify-between">
             <span>Share Meeting</span>
-            <Button variant="ghost" size="icon" onClick={onClose}>
-              <X className="h-4 w-4" />
-            </Button>
+            
           </DialogTitle>
         </DialogHeader>
         
