@@ -14,7 +14,7 @@ export function useSimpleWebRTC(meetingId: string, userSettings: any) {
   const [cameraEnabled, setCameraEnabled] = useState(true);
   const [micEnabled, setMicEnabled] = useState(true);
   const [socket, setSocket] = useState<WebSocket | null>(null);
-  
+
   const peerConnections = useRef<Map<string, RTCPeerConnection>>(new Map());
   const isInitiator = useRef<boolean>(false);
 
@@ -28,7 +28,7 @@ export function useSimpleWebRTC(meetingId: string, userSettings: any) {
           video: userSettings.cameraEnabled !== false,
           audio: userSettings.micEnabled !== false
         });
-        
+
         setLocalStream(stream);
         setCameraEnabled(userSettings.cameraEnabled !== false);
         setMicEnabled(userSettings.micEnabled !== false);
@@ -113,15 +113,17 @@ export function useSimpleWebRTC(meetingId: string, userSettings: any) {
     };
   }, [meetingId, userSettings]);
 
-const createPeerConnection = async (participantId: string, stream: MediaStream, ws: WebSocket, initiator: boolean) => {
+  const createPeerConnection = async (participantId: string, stream: MediaStream, ws: WebSocket, initiator: boolean) => {
+
     const pc = new RTCPeerConnection({
       iceServers: [
         { urls: 'stun:stun.l.google.com:19302' },
         { urls: 'stun:stun1.l.google.com:19302' },
         { urls: 'stun:stun2.l.google.com:3478' },
-        { urls: 'tcp://0.tcp.in.ngrok.io:12035?transport=tcp',
-            username: 'testuser',
-            credential: 'testpassword'
+        {
+          urls: 'turn:0.tcp.in.ngrok.io:12035?transport=tcp',
+          username: 'testuser',
+          credential: 'testpassword'
         },
       ]
     });
@@ -135,9 +137,9 @@ const createPeerConnection = async (participantId: string, stream: MediaStream, 
     pc.ontrack = (event) => {
       console.log('Received remote stream from', participantId);
       const remoteStream = event.streams[0];
-      setParticipants(prev => 
-        prev.map(p => 
-          p.id === participantId 
+      setParticipants(prev =>
+        prev.map(p =>
+          p.id === participantId
             ? { ...p, stream: remoteStream }
             : p
         )
@@ -175,7 +177,7 @@ const createPeerConnection = async (participantId: string, stream: MediaStream, 
 
   const handleOffer = async (fromId: string, offer: RTCSessionDescriptionInit, stream: MediaStream, ws: WebSocket) => {
     let pc = peerConnections.current.get(fromId);
-    
+
     if (!pc) {
       await createPeerConnection(fromId, stream, ws, false);
       pc = peerConnections.current.get(fromId);
@@ -186,7 +188,7 @@ const createPeerConnection = async (participantId: string, stream: MediaStream, 
         await pc.setRemoteDescription(offer);
         const answer = await pc.createAnswer();
         await pc.setLocalDescription(answer);
-        
+
         ws.send(JSON.stringify({
           type: 'webrtc-answer',
           targetId: fromId,
@@ -235,7 +237,7 @@ const createPeerConnection = async (participantId: string, stream: MediaStream, 
       if (videoTrack) {
         videoTrack.enabled = !videoTrack.enabled;
         setCameraEnabled(videoTrack.enabled);
-        
+
         // Update localStorage
         const userSettings = JSON.parse(localStorage.getItem('videoMeetUser') || '{}');
         userSettings.cameraEnabled = videoTrack.enabled;
@@ -250,7 +252,7 @@ const createPeerConnection = async (participantId: string, stream: MediaStream, 
       if (audioTrack) {
         audioTrack.enabled = !audioTrack.enabled;
         setMicEnabled(audioTrack.enabled);
-        
+
         // Update localStorage
         const userSettings = JSON.parse(localStorage.getItem('videoMeetUser') || '{}');
         userSettings.micEnabled = audioTrack.enabled;
