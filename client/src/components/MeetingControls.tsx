@@ -13,8 +13,8 @@ export default function MeetingControls({
   onToggleCamera,
   onToggleMicrophone,
   onEndCall,
-  cameraEnabled = true,
-  micEnabled = true
+  cameraEnabled,
+  micEnabled
 }: MeetingControlsProps) {
   return (
     <div className="fixed bottom-4 md:bottom-6 left-1/2 transform -translate-x-1/2 z-50">

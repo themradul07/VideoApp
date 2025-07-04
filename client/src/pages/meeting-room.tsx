@@ -39,16 +39,12 @@ export default function MeetingRoom() {
     enabled: !!meetingId,
   });
 
+  
+
   // Initialize WebRTC connection
-  const {
-    localStream,
-    participants,
-    cameraEnabled,
-    micEnabled,
-    toggleCamera,
-    toggleMicrophone,
-    endCall,
-  } = useSimpleWebRTC(meetingId!, userSettings);
+
+  const { localStream, participants, cameraEnabled, micEnabled, toggleCamera, toggleMicrophone, endCall } = useSimpleWebRTC(meetingId!, userSettings);
+  // console.log('participants', participants);
 
   const handleEndCall = () => {
     endCall();
@@ -164,6 +160,8 @@ export default function MeetingRoom() {
 
           {/* Remote videos */}
           {participants.map((participant) => (
+            
+
             <VideoTile
               key={participant.id}
               stream={participant.stream}
@@ -182,8 +180,8 @@ export default function MeetingRoom() {
         onToggleCamera={toggleCamera}
         onToggleMicrophone={toggleMicrophone}
         onEndCall={handleEndCall}
-        cameraEnabled={userSettings?.cameraEnabled}
-        micEnabled={userSettings?.micEnabled}
+        cameraEnabled={cameraEnabled}
+        micEnabled={micEnabled}
       />
 
       {/* Invite Modal */}
