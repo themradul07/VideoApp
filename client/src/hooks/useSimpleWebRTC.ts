@@ -308,14 +308,36 @@ const toggleMicrophone = () => {
 };
 
   const endCall = () => {
+    // 1. Notify server and others
+    if (socket && userSettings?.participantId) {
+      socket.send(JSON.stringify({
+        type: 'leave-room',
+        meetingId,
+        participantId: userSettings.participantId,
+      }));
+    }
+
+    // 2. Stop local media
     if (localStream) {
       localStream.getTracks().forEach(track => track.stop());
     }
     setLocalStream(null);
-    setParticipants([]);
+
+    // 3. Close all peer connections
     peerConnections.current.forEach(pc => pc.close());
     peerConnections.current.clear();
+
+    // 4. Clear participants
+    setParticipants([]);
+
+    // 5. Optionally close socket after a short delay to ensure message is sent
+    setTimeout(() => {
+      if (socket) {
+        socket.close();
+      }
+    }, 200);
   };
+
 
 
   // Start screen sharing

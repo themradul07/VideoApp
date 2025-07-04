@@ -169,6 +169,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
               }));
             }
             break;
+          case 'leave-room': {
+          
+          const { meetingId, participantId } = data;
+          const roomClients = rooms.get(meetingId);
+          if (roomClients) {
+            // Find the client WebSocket instance
+            const leavingClient = Array.from(roomClients).find(
+              client => client.participantId === participantId
+            );
+            if (leavingClient) {
+              roomClients.delete(leavingClient);
+              // Optionally, close the socket (if you want)
+              leavingClient.close();
+            }
+            // Broadcast to others that this participant left
+            broadcastToRoom(meetingId, {
+              type: 'participant-left',
+              participantId,
+            });
+            // Clean up empty rooms
+            if (roomClients.size === 0) {
+              rooms.delete(meetingId);
+            }
+          }
+          break;
+        }
 
           case 'media-state-change':
             // Broadcast media state changes (mute/unmute, camera on/off)
