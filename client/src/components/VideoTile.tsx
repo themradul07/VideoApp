@@ -19,10 +19,14 @@ export default function VideoTile({
   const videoRef = useRef<HTMLVideoElement>(null);
 
   useEffect(() => {
-    if (videoRef.current && stream) {
+    if (videoRef.current && stream && cameraEnabled && stream.getVideoTracks().length > 0) {
       videoRef.current.srcObject = stream;
+      videoRef.current.play().catch(() => {});
+    } else if (videoRef.current) {
+      videoRef.current.srcObject = null;
     }
-  }, [stream]);
+  }, [stream, cameraEnabled]);
+
 
   const getInitials = (name: string) => {
     return name.split(' ').map(n => n[0]).join('').toUpperCase();

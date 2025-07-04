@@ -39,12 +39,34 @@ export function useSimpleWebRTC(meetingId: string, userSettings: any) {
   const [cameraEnabled, setCameraEnabled] = useState(true);
   const [micEnabled, setMicEnabled] = useState(true);
   const [socket, setSocket] = useState<WebSocket | null>(null);
+
   const [iceServers, setIceServers] = useState<RTCIceServer[]>([]);
+
+  const [isScreenSharing, setIsScreenSharing] = useState(false);
+  const [screenStream, setScreenStream] = useState<MediaStream | null>(null);
+
+
+
   const peerConnections = useRef<Map<string, RTCPeerConnection>>(new Map());
   const isInitiator = useRef<boolean>(false);
   
   
 
+
+  function addTrackToPeers(track: MediaStreamTrack, localStream: MediaStream) {
+    // Add to local stream if not present
+    if (!localStream.getTracks().find(t => t.id === track.id)) {
+      localStream.addTrack(track);
+    }
+    // Add to all peer connections
+    peerConnections.current.forEach(pc => {
+      // Only add if not already sending this track
+      const alreadySending = pc.getSenders().some(sender => sender.track && sender.track.id === track.id);
+      if (!alreadySending) {
+        pc.addTrack(track, localStream);
+      }
+    });
+  }
 
   useEffect(() => {
     if (!meetingId || !userSettings) return;
@@ -58,11 +80,16 @@ export function useSimpleWebRTC(meetingId: string, userSettings: any) {
         setIceServers(servers);
         console.log("ICE servers to use:", iceServers, Array.isArray(iceServers));
         // Get user media
-        const stream = await navigator.mediaDevices.getUserMedia({
-          video: userSettings.cameraEnabled !== false,
-          audio: userSettings.micEnabled !== false
-        });
-
+        let stream;
+        if (userSettings.cameraEnabled !== false || userSettings.micEnabled !== false) {
+          stream = await navigator.mediaDevices.getUserMedia({
+            video: userSettings.cameraEnabled !== false,
+            audio: userSettings.micEnabled !== false
+          });
+        } else {
+          // Create an empty MediaStream if both are off
+          stream = new MediaStream();
+        }
         setLocalStream(stream);
         setCameraEnabled(userSettings.cameraEnabled !== false);
         setMicEnabled(userSettings.micEnabled !== false);
@@ -74,31 +101,43 @@ export function useSimpleWebRTC(meetingId: string, userSettings: any) {
 
         ws.onopen = () => {
           console.log("WebSocket connected");
+          
           // Join the meeting room
           ws.send(JSON.stringify({
             type: 'join-room',
             meetingId,
             participantId: userSettings.participantId,
-            participantName: userSettings.displayName
+            participantName: userSettings.displayName,
+            cameraEnabled : userSettings.cameraEnabled !== false,
+            micEnabled: userSettings.micEnabled !== false
           }));
         };
+
+        
 
         ws.onmessage = async (event) => {
           const data = JSON.parse(event.data);
           console.log('Received message:', data);
+         
 
           switch (data.type) {
             case 'participant-joined':
               // New participant joined, initiate connection if we're already in the room
+              console.log('New participant joined:', data.participant);
               if (data.participant.id !== userSettings.participantId) {
+
                 await createPeerConnection(data.participant.id, stream, ws, true,servers);
+
                 setParticipants(prev => [...prev, data.participant]);
+                
               }
+           
               break;
 
             case 'room-participants':
               // Existing participants in the room
               setParticipants(data.participants.filter((p: any) => p.id !== userSettings.participantId));
+              
               // Create connections to existing participants
               for (const participant of data.participants) {
                 if (participant.id !== userSettings.participantId) {
@@ -122,6 +161,19 @@ export function useSimpleWebRTC(meetingId: string, userSettings: any) {
             case 'participant-left':
               handleParticipantLeft(data.participantId);
               break;
+
+            case 'participant-media-change':
+              // Update participant's media state
+              setParticipants(prev =>
+                prev.map(p =>
+                  p.id === data.participantId
+                    ? { ...p, cameraEnabled: data.cameraEnabled, micEnabled: data.micEnabled }
+                    : p
+                )
+              );
+              break;
+
+            
           }
         };
 
@@ -266,45 +318,161 @@ export function useSimpleWebRTC(meetingId: string, userSettings: any) {
     setParticipants(prev => prev.filter(p => p.id !== participantId));
   };
 
-  const toggleCamera = () => {
-    if (localStream) {
-      const videoTrack = localStream.getVideoTracks()[0];
-      if (videoTrack) {
-        videoTrack.enabled = !videoTrack.enabled;
-        setCameraEnabled(videoTrack.enabled);
+  
+const sendMediaStateChange = (camera: boolean, mic: boolean) => {
+  if (socket) {
+    socket.send(JSON.stringify({
+      type: 'media-state-change',
+      participantId: userSettings.participantId,
+      cameraEnabled: camera,
+      micEnabled: mic
+    }));
+  }
+};
 
-        // Update localStorage
-        const userSettings = JSON.parse(localStorage.getItem('videoMeetUser') || '{}');
-        userSettings.cameraEnabled = videoTrack.enabled;
-        localStorage.setItem('videoMeetUser', JSON.stringify(userSettings));
-      }
+const toggleCamera = async () => {
+  if (!localStream) return;
+
+  let videoTrack = localStream.getVideoTracks()[0];
+
+  if (videoTrack) {
+    // Toggle enabled
+    videoTrack.enabled = !videoTrack.enabled;
+    setCameraEnabled(videoTrack.enabled);
+    sendMediaStateChange(videoTrack.enabled, micEnabled);
+  } else {
+    // No video track: get one and add it
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+      videoTrack = stream.getVideoTracks()[0];
+      addTrackToPeers(videoTrack, localStream);
+      setCameraEnabled(true);
+      sendMediaStateChange(true, micEnabled);
+    } catch (err) {
+      console.error("Error enabling camera:", err);
     }
-  };
+  }
+};
 
-  const toggleMicrophone = () => {
-    if (localStream) {
-      const audioTrack = localStream.getAudioTracks()[0];
-      if (audioTrack) {
-        audioTrack.enabled = !audioTrack.enabled;
-        setMicEnabled(audioTrack.enabled);
 
-        // Update localStorage
-        const userSettings = JSON.parse(localStorage.getItem('videoMeetUser') || '{}');
-        userSettings.micEnabled = audioTrack.enabled;
-        localStorage.setItem('videoMeetUser', JSON.stringify(userSettings));
-      }
+const toggleMicrophone = async () => {
+  if (!localStream) return;
+
+  let audioTrack = localStream.getAudioTracks()[0];
+
+  if (audioTrack) {
+    audioTrack.enabled = !audioTrack.enabled;
+    setMicEnabled(audioTrack.enabled);
+    sendMediaStateChange(cameraEnabled, audioTrack.enabled);
+  } else {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      audioTrack = stream.getAudioTracks()[0];
+      addTrackToPeers(audioTrack, localStream);
+      setMicEnabled(true);
+      sendMediaStateChange(cameraEnabled, true);
+    } catch (err) {
+      console.error("Error enabling mic:", err);
     }
-  };
+  }
+};
+
 
   const endCall = () => {
+    // 1. Notify server and others
+    if (socket && userSettings?.participantId) {
+      socket.send(JSON.stringify({
+        type: 'leave-room',
+        meetingId,
+        participantId: userSettings.participantId,
+      }));
+    }
+
+    // 2. Stop local media
     if (localStream) {
       localStream.getTracks().forEach(track => track.stop());
     }
     setLocalStream(null);
-    setParticipants([]);
+
+    // 3. Close all peer connections
     peerConnections.current.forEach(pc => pc.close());
     peerConnections.current.clear();
+
+    // 4. Clear participants
+    setParticipants([]);
+
+    // 5. Optionally close socket after a short delay to ensure message is sent
+    setTimeout(() => {
+      if (socket) {
+        socket.close();
+      }
+    }, 200);
   };
+
+
+
+  // Start screen sharing
+const startScreenShare = async () => {
+  try {
+    const displayStream = await navigator.mediaDevices.getDisplayMedia({ video: true });
+    setScreenStream(displayStream);
+    setIsScreenSharing(true);
+
+    // Replace the video track in all peer connections
+    const screenTrack = displayStream.getVideoTracks()[0];
+    peerConnections.current.forEach((pc) => {
+      const senders = pc.getSenders().filter(s => s.track && s.track.kind === 'video');
+      if (senders.length > 0) {
+        senders[0].replaceTrack(screenTrack);
+      }
+    });
+
+    // Replace local video track for local preview
+    setLocalStream((prev) => {
+      if (!prev) return prev;
+      const newStream = new MediaStream([
+        screenTrack,
+        ...prev.getAudioTracks()
+      ]);
+      return newStream;
+    });
+
+    // When user stops sharing from browser UI
+    screenTrack.onended = () => {
+      stopScreenShare();
+    };
+  } catch (err) {
+    console.error("Error sharing screen:", err);
+  }
+};
+
+// Stop screen sharing and revert to camera
+const stopScreenShare = async () => {
+  if (screenStream) {
+    screenStream.getTracks().forEach(track => track.stop());
+    setScreenStream(null);
+  }
+  setIsScreenSharing(false);
+
+  // Get camera again
+  const cameraStream = await navigator.mediaDevices.getUserMedia({
+    video: cameraEnabled,
+    audio: micEnabled,
+  });
+
+  // Replace the video track in all peer connections
+  const cameraTrack = cameraStream.getVideoTracks()[0];
+  peerConnections.current.forEach((pc) => {
+    const senders = pc.getSenders().filter(s => s.track && s.track.kind === 'video');
+    if (senders.length > 0) {
+      senders[0].replaceTrack(cameraTrack);
+    }
+  });
+
+  // Update local stream for preview
+  setLocalStream(cameraStream);
+};
+
 
   return {
     localStream,
@@ -313,6 +481,9 @@ export function useSimpleWebRTC(meetingId: string, userSettings: any) {
     micEnabled,
     toggleCamera,
     toggleMicrophone,
-    endCall
+    endCall,
+    isScreenSharing,
+    startScreenShare,
+    stopScreenShare,
   };
 }

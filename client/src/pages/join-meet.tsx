@@ -27,20 +27,19 @@ export default function JoinMeet() {
 
   const joinMeetingMutation = useMutation({
     mutationFn: async (data: { meetingId: string; participant: any }) => {
-      // First check if meeting exists
+       // First check if meeting exists
       const meetingResponse = await apiRequest("GET", `/api/meetings/${data.meetingId}`);
       const meeting = await meetingResponse.json();
-      
-      if (!meeting.isActive) {
-        throw new Error("Meeting is not active");
-      }
-      
-      // Join the meeting
+      if (!meeting.isActive) throw new Error("Meeting is not active");
+
+
+       // Join the meeting
       const response = await apiRequest("POST", `/api/meetings/${data.meetingId}/join`, data.participant);
       return response.json();
     },
     onSuccess: (data) => {
-      // Store user settings in localStorage
+
+       // Store user settings in localStorage
       const participantId = `participant-${Math.random().toString(36).substr(2, 9)}`;
       localStorage.setItem('videoMeetUser', JSON.stringify({
         displayName,
@@ -48,7 +47,6 @@ export default function JoinMeet() {
         micEnabled,
         participantId
       }));
-      
       setLocation(`/meet/${meetingCode}`);
     },
     onError: (error) => {
@@ -62,27 +60,15 @@ export default function JoinMeet() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    
     if (!meetingCode.trim()) {
-      toast({
-        title: "Meeting code required",
-        description: "Please enter a meeting code",
-        variant: "destructive",
-      });
+      toast({ title: "Meeting code required", description: "Please enter a meeting code", variant: "destructive" });
       return;
     }
-
     if (!displayName.trim()) {
-      toast({
-        title: "Display name required",
-        description: "Please enter your display name",
-        variant: "destructive",
-      });
+      toast({ title: "Display name required", description: "Please enter your display name", variant: "destructive" });
       return;
     }
-
     const participantId = `participant-${Math.random().toString(36).substr(2, 9)}`;
-    
     joinMeetingMutation.mutate({
       meetingId: meetingCode.trim(),
       participant: {
@@ -90,21 +76,19 @@ export default function JoinMeet() {
         name: displayName.trim(),
         cameraEnabled,
         micEnabled,
-        joinedAt: new Date().toISOString()
+        joinedAt: new Date().toISOString(),
       }
     });
   };
 
   return (
-    <div className="gradient-bg min-h-screen flex items-center justify-center p-4">
-      <Card className="w-full max-w-md bg-white/10 backdrop-blur-sm border-white/20">
+    <div className="bg-gradient-to-br from-indigo-600 via-purple-600 to-pink-500 min-h-screen flex items-center justify-center p-6">
+      <Card className="w-full max-w-md bg-white/10 backdrop-blur-md border border-white/20 shadow-xl">
         <CardHeader className="text-center">
-          <CardTitle className="text-white text-xl md:text-2xl">Join a Meeting</CardTitle>
-          <CardDescription className="text-white/80">
-            Enter your name to join the video call and connect with your team, clients, or friends.
-          </CardDescription>
+          <CardTitle className="text-white text-2xl font-bold drop-shadow">Join a Meeting</CardTitle>
+          <CardDescription className="text-white/80">Enter your name and meeting code to join</CardDescription>
         </CardHeader>
-        
+
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-6">
             <div className="space-y-2">
@@ -116,10 +100,9 @@ export default function JoinMeet() {
                 value={meetingCode}
                 onChange={(e) => setMeetingCode(e.target.value)}
                 className="bg-white/20 border-white/30 text-white placeholder-white/60"
-                required
               />
             </div>
-            
+
             <div className="space-y-2">
               <Label htmlFor="displayName" className="text-white">Your Display Name</Label>
               <Input
@@ -129,47 +112,38 @@ export default function JoinMeet() {
                 value={displayName}
                 onChange={(e) => setDisplayName(e.target.value)}
                 className="bg-white/20 border-white/30 text-white placeholder-white/60"
-                required
               />
             </div>
-            
+
             <div className="space-y-4">
               <div className="flex items-center justify-between">
                 <div className="flex items-center space-x-2">
                   <Video className="h-4 w-4 text-white/80" />
                   <Label htmlFor="camera" className="text-white">Camera</Label>
                 </div>
-                <Switch
-                  id="camera"
-                  checked={cameraEnabled}
-                  onCheckedChange={setCameraEnabled}
-                />
+                <Switch id="camera" checked={cameraEnabled} onCheckedChange={setCameraEnabled} />
               </div>
-              
+
               <div className="flex items-center justify-between">
                 <div className="flex items-center space-x-2">
                   <Mic className="h-4 w-4 text-white/80" />
                   <Label htmlFor="microphone" className="text-white">Microphone</Label>
                 </div>
-                <Switch
-                  id="microphone"
-                  checked={micEnabled}
-                  onCheckedChange={setMicEnabled}
-                />
+                <Switch id="microphone" checked={micEnabled} onCheckedChange={setMicEnabled} />
               </div>
             </div>
-            
-            <Button 
-              type="submit" 
-              className="w-full bg-white/20 hover:bg-white/30 text-white border border-white/30"
+
+            <Button
+              type="submit"
+              className="w-full bg-white text-indigo-700 hover:bg-yellow-300 hover:text-black border border-white/30 transition-all duration-300 shadow-md"
               disabled={joinMeetingMutation.isPending}
             >
               {joinMeetingMutation.isPending ? "Joining..." : "Join Now"}
             </Button>
           </form>
-          
-          <Button 
-            variant="ghost" 
+
+          <Button
+            variant="ghost"
             className="w-full mt-4 text-white/80 hover:text-white"
             onClick={() => setLocation("/")}
           >
