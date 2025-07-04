@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { useLocation } from "wouter";
 import { ArrowLeft, Video, Mic } from "lucide-react";
@@ -23,14 +24,13 @@ export default function CreateMeet() {
       return response.json();
     },
     onSuccess: (data) => {
-      // Store user settings in localStorage
+         // Store user settings in localStorage
       localStorage.setItem('videoMeetUser', JSON.stringify({
         displayName,
         cameraEnabled,
         micEnabled,
         participantId: data.hostId
       }));
-      
       setLocation(`/meet/${data.meetingId}`);
     },
     onError: (error) => {
@@ -44,7 +44,6 @@ export default function CreateMeet() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    
     if (!displayName.trim()) {
       toast({
         title: "Display name required",
@@ -53,10 +52,8 @@ export default function CreateMeet() {
       });
       return;
     }
-
     const meetingId = `meet-${Math.random().toString(36).substr(2, 9)}`;
     const hostId = `host-${Math.random().toString(36).substr(2, 9)}`;
-    
     createMeetingMutation.mutate({
       meetingId,
       hostId,
@@ -65,15 +62,15 @@ export default function CreateMeet() {
   };
 
   return (
-    <div className="gradient-bg min-h-screen flex items-center justify-center p-4">
-      <Card className="w-full max-w-md bg-white/10 backdrop-blur-sm border-white/20">
+    <div className="bg-gradient-to-br from-indigo-600 via-purple-600 to-pink-500 min-h-screen flex items-center justify-center p-6 animate-fade-in">
+      <Card className="w-full max-w-md bg-white/10 backdrop-blur-sm border border-white/20 shadow-xl rounded-2xl">
         <CardHeader className="text-center">
-          <CardTitle className="text-white text-xl md:text-2xl">Set Up Your Meeting</CardTitle>
-          <CardDescription className="text-white/80">
+          <CardTitle className="text-white text-2xl md:text-3xl font-bold mb-2">Set Up Your Meeting</CardTitle>
+          <CardDescription className="text-white/80 text-sm md:text-base">
             Prepare to connect with others. Enable your camera and mic, and choose a display name to get started.
           </CardDescription>
         </CardHeader>
-        
+
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-6">
             <div className="space-y-2">
@@ -84,11 +81,11 @@ export default function CreateMeet() {
                 placeholder="Enter your display name"
                 value={displayName}
                 onChange={(e) => setDisplayName(e.target.value)}
-                className="bg-white/20 border-white/30 text-white placeholder-white/60"
+                className="bg-white/20 border-white/30 text-white placeholder-white/60 focus:ring-yellow-300"
                 required
               />
             </div>
-            
+
             <div className="space-y-4">
               <div className="flex items-center justify-between">
                 <div className="flex items-center space-x-2">
@@ -101,7 +98,7 @@ export default function CreateMeet() {
                   onCheckedChange={setCameraEnabled}
                 />
               </div>
-              
+
               <div className="flex items-center justify-between">
                 <div className="flex items-center space-x-2">
                   <Mic className="h-4 w-4 text-white/80" />
@@ -114,26 +111,37 @@ export default function CreateMeet() {
                 />
               </div>
             </div>
-            
-            <Button 
-              type="submit" 
-              className="w-full bg-white/20 hover:bg-white/30 text-white border border-white/30"
+
+            <Button
+              type="submit"
+              className="w-full bg-white text-indigo-700 hover:bg-yellow-300 hover:text-black border-white/30 font-semibold text-lg py-2.5 rounded-xl transition-transform transform hover:scale-105"
               disabled={createMeetingMutation.isPending}
             >
               {createMeetingMutation.isPending ? "Creating..." : "Create and Join"}
             </Button>
           </form>
-          
-          <Button 
-            variant="ghost" 
-            className="w-full mt-4 text-white/80 hover:text-white"
+
+          <Button
+            variant="ghost"
+            className="w-full mt-4 text-white/80 hover:text-white flex justify-center items-center gap-2"
             onClick={() => setLocation("/")}
           >
-            <ArrowLeft className="mr-2 h-4 w-4" />
+            <ArrowLeft className="h-4 w-4" />
             Back to Home
           </Button>
         </CardContent>
       </Card>
+
+      <style jsx>{`
+        .animate-fade-in {
+          animation: fadeIn 0.8s ease-in-out both;
+        }
+
+        @keyframes fadeIn {
+          from { opacity: 0; transform: translateY(20px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+      `}</style>
     </div>
   );
 }
