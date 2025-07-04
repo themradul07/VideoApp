@@ -19,30 +19,11 @@ export default function VideoTile({
   const videoRef = useRef<HTMLVideoElement>(null);
 
   useEffect(() => {
-    if (videoRef.current && stream) {
+    if (videoRef.current && stream && cameraEnabled && stream.getVideoTracks().length > 0) {
       videoRef.current.srcObject = stream;
-    }
-  }, [stream]);
-
-  useEffect(() => {
-    if (videoRef.current) {
-      if (stream) {
-        // Always set the stream to ensure updates are reflected
-        videoRef.current.srcObject = stream;
-
-        // If camera is enabled, play the video
-        if (cameraEnabled) {
-          videoRef.current.play().catch((err) => {
-            // Handle play() promise rejection
-            console.warn('Video play failed:', err);
-          });
-        } else {
-          // Pause the video if camera is disabled
-          videoRef.current.pause();
-        }
-      } else {
-        videoRef.current.srcObject = null;
-      }
+      videoRef.current.play().catch(() => {});
+    } else if (videoRef.current) {
+      videoRef.current.srcObject = null;
     }
   }, [stream, cameraEnabled]);
 
