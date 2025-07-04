@@ -157,8 +157,8 @@ export default function MeetingRoom() {
         onToggleCamera={toggleCamera}
         onToggleMicrophone={toggleMicrophone}
         onEndCall={handleEndCall}
-        cameraEnabled={userSettings?.cameraEnabled}
-        micEnabled={userSettings?.micEnabled}
+        cameraEnabled={cameraEnabled}
+        micEnabled={micEnabled}
       />
 
       {/* Invite Modal */}

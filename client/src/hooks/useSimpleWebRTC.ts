@@ -297,7 +297,6 @@ const toggleMicrophone = () => {
       userSettings.micEnabled = audioTrack.enabled;
       localStorage.setItem('videoMeetUser', JSON.stringify(userSettings));
 
-      // Send to backend
       sendMediaStateChange(cameraEnabled, audioTrack.enabled);
     }
   }
