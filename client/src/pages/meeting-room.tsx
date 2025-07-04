@@ -20,7 +20,7 @@ export default function MeetingRoom() {
 
   // Load user settings from localStorage
   useEffect(() => {
-    const savedSettings = localStorage.getItem('videoMeetUser');
+    const savedSettings = localStorage.getItem("videoMeetUser");
     if (savedSettings) {
       setUserSettings(JSON.parse(savedSettings));
     } else {
@@ -30,7 +30,11 @@ export default function MeetingRoom() {
   }, [meetingId, setLocation]);
 
   // Fetch meeting data
-  const { data: meeting, isLoading, error } = useQuery({
+  const {
+    data: meeting,
+    isLoading,
+    error,
+  } = useQuery({
     queryKey: [`/api/meetings/${meetingId}`],
     enabled: !!meetingId,
   });
@@ -38,12 +42,13 @@ export default function MeetingRoom() {
   
 
   // Initialize WebRTC connection
+
   const { localStream, participants, cameraEnabled, micEnabled, toggleCamera, toggleMicrophone, endCall } = useSimpleWebRTC(meetingId!, userSettings);
   // console.log('participants', participants);
 
   const handleEndCall = () => {
     endCall();
-    setLocation('/');
+    setLocation("/");
   };
 
   if (isLoading) {
@@ -59,8 +64,13 @@ export default function MeetingRoom() {
       <div className="min-h-screen bg-gray-900 flex items-center justify-center">
         <div className="text-center text-white">
           <h2 className="text-2xl font-bold mb-4">Meeting not found</h2>
-          <p className="text-gray-400 mb-4">The meeting you're looking for doesn't exist or has ended.</p>
-          <Button onClick={() => setLocation('/')} className="bg-blue-600 hover:bg-blue-700">
+          <p className="text-gray-400 mb-4">
+            The meeting you're looking for doesn't exist or has ended.
+          </p>
+          <Button
+            onClick={() => setLocation("/")}
+            className="bg-blue-600 hover:bg-blue-700"
+          >
             Back to Home
           </Button>
         </div>
@@ -73,8 +83,12 @@ export default function MeetingRoom() {
       {/* Header */}
       <header className="bg-gray-800/90 backdrop-blur-sm border-b border-gray-700/50 p-3 md:p-4 flex items-center justify-between">
         <div className="flex items-center space-x-2 md:space-x-4">
-          <h1 className="text-base md:text-lg font-semibold text-white">VideoMeet</h1>
-          <span className="text-gray-400 text-xs md:text-sm hidden sm:block">Meeting ID: {meetingId}</span>
+          <h1 className="text-base md:text-lg font-semibold text-white">
+            VideoMeet
+          </h1>
+          <span className="text-gray-400 text-xs md:text-sm hidden sm:block">
+            Meeting ID: {meetingId}
+          </span>
         </div>
         <div className="flex items-center space-x-1 md:space-x-2">
           <Button
@@ -86,7 +100,9 @@ export default function MeetingRoom() {
           </Button>
           <div className="text-gray-400 text-xs md:text-sm flex items-center">
             <Users className="mr-1 h-3 md:h-4 w-3 md:w-4" />
-            <span className="hidden sm:inline">{participants.length + 1} participants</span>
+            <span className="hidden sm:inline">
+              {participants.length + 1} participants
+            </span>
             <span className="sm:hidden">{participants.length + 1}</span>
           </div>
         </div>
@@ -99,12 +115,12 @@ export default function MeetingRoom() {
           {/* Local video */}
           <VideoTile 
             stream={localStream}
-            participantName={userSettings?.displayName || 'You'}
+            participantName={userSettings?.displayName || "You"}
             isLocal={true}
             cameraEnabled={cameraEnabled}
             micEnabled={micEnabled}
           />
-          
+
           {/* Remote videos */}
           {participants.map((participant) => (
             <VideoTile
@@ -119,23 +135,29 @@ export default function MeetingRoom() {
         </div>
 
         {/* Laptop/Desktop: Grid layout */}
-        <div className="hidden md:grid gap-4 h-full auto-rows-fr" style={{
-          gridTemplateColumns: participants.length === 0 ? '1fr' : 
-                              participants.length === 1 ? 'repeat(2, 1fr)' :
-                              participants.length === 2 ? 'repeat(2, 1fr)' :
-                              participants.length <= 4 ? 'repeat(2, 1fr)' :
-                              participants.length <= 8 ? 'repeat(3, 1fr)' :
-                              'repeat(4, 1fr)'
-        }}>
+
+        <div
+          className={`hidden md:grid gap-4 h-full px-4 py-2 ${
+            participants.length >= 0 ? "overflow-y-auto" : ""
+          }`}
+          style={{
+            alignContent: "start",
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))",
+            gridAutoRows: "minmax(200px, auto)",
+            // gridAutoRows: '1fr',
+          }}
+        >
           {/* Local video */}
           <VideoTile
             stream={localStream}
-            participantName={userSettings?.displayName || 'You'}
+            participantName={userSettings?.displayName || "You"}
             isLocal={true}
             cameraEnabled={cameraEnabled}
             micEnabled={micEnabled}
+            showName={true}
           />
-          
+
           {/* Remote videos */}
           {participants.map((participant) => (
             
@@ -147,6 +169,7 @@ export default function MeetingRoom() {
               isLocal={false}
               cameraEnabled={participant.cameraEnabled}
               micEnabled={participant.micEnabled}
+              showName={true}
             />
           ))}
         </div>
