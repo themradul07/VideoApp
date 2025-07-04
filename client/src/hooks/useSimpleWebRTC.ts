@@ -8,18 +8,50 @@ interface Participant {
   micEnabled?: boolean;
 }
 
+  async function fetchXirsysIceServers(): Promise<RTCIceServer[]> {
+  const username = "Khyati";
+  const secret = "84b4707c-584e-11f0-a076-c6df31465732";
+  const channel = "MyFirstApp";
+
+  const response = await fetch(`https://global.xirsys.net/_turn/${channel}`, {
+    method: "PUT",
+    headers: {
+      "Authorization": "Basic " + btoa(username + ":" + secret),
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({ format: "urls" })
+  });
+
+  const data = await response.json();
+  // Defensive: Ensure iceServers is always an array
+  let iceServers = data.v.iceServers;
+  if (!Array.isArray(iceServers)) {
+    // If it's a single object, wrap it in an array
+    iceServers = [iceServers];
+  }
+  return iceServers;
+}
+
+
 export function useSimpleWebRTC(meetingId: string, userSettings: any) {
   const [localStream, setLocalStream] = useState<MediaStream | null>(null);
   const [participants, setParticipants] = useState<Participant[]>([]);
   const [cameraEnabled, setCameraEnabled] = useState(true);
   const [micEnabled, setMicEnabled] = useState(true);
   const [socket, setSocket] = useState<WebSocket | null>(null);
+
+  const [iceServers, setIceServers] = useState<RTCIceServer[]>([]);
+
   const [isScreenSharing, setIsScreenSharing] = useState(false);
   const [screenStream, setScreenStream] = useState<MediaStream | null>(null);
 
 
+
   const peerConnections = useRef<Map<string, RTCPeerConnection>>(new Map());
   const isInitiator = useRef<boolean>(false);
+  
+  
+
 
   function addTrackToPeers(track: MediaStreamTrack, localStream: MediaStream) {
     // Add to local stream if not present
@@ -41,6 +73,12 @@ export function useSimpleWebRTC(meetingId: string, userSettings: any) {
 
     const initializeConnection = async () => {
       try {
+
+         // 1. Fetch ICE servers from Xirsys
+        const servers = await fetchXirsysIceServers();
+        console.log("Fetched ICE servers:", servers);
+        setIceServers(servers);
+        console.log("ICE servers to use:", iceServers, Array.isArray(iceServers));
         // Get user media
         let stream;
         if (userSettings.cameraEnabled !== false || userSettings.micEnabled !== false) {
@@ -87,8 +125,9 @@ export function useSimpleWebRTC(meetingId: string, userSettings: any) {
               // New participant joined, initiate connection if we're already in the room
               console.log('New participant joined:', data.participant);
               if (data.participant.id !== userSettings.participantId) {
-                await createPeerConnection(data.participant.id, stream, ws, true);
-        
+
+                await createPeerConnection(data.participant.id, stream, ws, true,servers);
+
                 setParticipants(prev => [...prev, data.participant]);
                 
               }
@@ -102,13 +141,13 @@ export function useSimpleWebRTC(meetingId: string, userSettings: any) {
               // Create connections to existing participants
               for (const participant of data.participants) {
                 if (participant.id !== userSettings.participantId) {
-                  await createPeerConnection(participant.id, stream, ws, false);
+                  await createPeerConnection(participant.id, stream, ws, false,servers);
                 }
               }
               break;
 
             case 'webrtc-offer':
-              await handleOffer(data.fromId, data.offer, stream, ws);
+              await handleOffer(data.fromId, data.offer, stream, ws,servers);
               break;
 
             case 'webrtc-answer':
@@ -160,20 +199,21 @@ export function useSimpleWebRTC(meetingId: string, userSettings: any) {
     };
   }, [meetingId, userSettings]);
 
-  const createPeerConnection = async (participantId: string, stream: MediaStream, ws: WebSocket, initiator: boolean) => {
+  const createPeerConnection = async (participantId: string, stream: MediaStream, ws: WebSocket, initiator: boolean, iceServers: RTCIceServer[]) => {
 
-    const pc = new RTCPeerConnection({
-      iceServers: [
-        { urls: 'stun:stun.l.google.com:19302' },
-        { urls: 'stun:stun1.l.google.com:19302' },
-        { urls: 'stun:stun2.l.google.com:3478' },
-        {
-          urls: 'turn:0.tcp.in.ngrok.io:12035?transport=tcp',
-          username: 'testuser',
-          credential: 'testpassword'
-        },
-      ]
-    });
+    // const pc = new RTCPeerConnection({
+    //   iceServers: [
+    //     { urls: 'stun:stun.l.google.com:19302' },
+    //     { urls: 'stun:stun1.l.google.com:19302' },
+    //     { urls: 'stun:stun2.l.google.com:3478' },
+    //     {
+    //       urls: 'turn:0.tcp.in.ngrok.io:12035?transport=tcp',
+    //       username: 'testuser',
+    //       credential: 'testpassword'
+    //     },
+    //   ]
+    // });
+     const pc = new RTCPeerConnection({ iceServers });
 
     // Add local stream
     stream.getTracks().forEach(track => {
@@ -222,11 +262,11 @@ export function useSimpleWebRTC(meetingId: string, userSettings: any) {
     }
   };
 
-  const handleOffer = async (fromId: string, offer: RTCSessionDescriptionInit, stream: MediaStream, ws: WebSocket) => {
+  const handleOffer = async (fromId: string, offer: RTCSessionDescriptionInit, stream: MediaStream, ws: WebSocket,iceServers: RTCIceServer[]) => {
     let pc = peerConnections.current.get(fromId);
 
     if (!pc) {
-      await createPeerConnection(fromId, stream, ws, false);
+      await createPeerConnection(fromId, stream, ws, false,iceServers);
       pc = peerConnections.current.get(fromId);
     }
 
