@@ -281,6 +281,8 @@ const toggleCamera = () => {
 
       // Send to backend
       sendMediaStateChange(videoTrack.enabled, micEnabled);
+
+     
     }
   }
 };

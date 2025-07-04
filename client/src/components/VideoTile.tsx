@@ -24,6 +24,29 @@ export default function VideoTile({
     }
   }, [stream]);
 
+  useEffect(() => {
+    if (videoRef.current) {
+      if (stream) {
+        // Always set the stream to ensure updates are reflected
+        videoRef.current.srcObject = stream;
+
+        // If camera is enabled, play the video
+        if (cameraEnabled) {
+          videoRef.current.play().catch((err) => {
+            // Handle play() promise rejection
+            console.warn('Video play failed:', err);
+          });
+        } else {
+          // Pause the video if camera is disabled
+          videoRef.current.pause();
+        }
+      } else {
+        videoRef.current.srcObject = null;
+      }
+    }
+  }, [stream, cameraEnabled]);
+
+
   const getInitials = (name: string) => {
     return name.split(' ').map(n => n[0]).join('').toUpperCase();
   };

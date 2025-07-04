@@ -113,7 +113,7 @@ export default function MeetingRoom() {
         {/* Mobile: Column layout */}
         <div className="flex flex-col gap-2 h-full md:hidden overflow-y-auto">
           {/* Local video */}
-          <VideoTile
+          <VideoTile 
             stream={localStream}
             participantName={userSettings?.displayName || "You"}
             isLocal={true}
