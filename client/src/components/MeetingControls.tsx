@@ -1,4 +1,4 @@
-import { Video, VideoOff, Mic, MicOff, Phone, MoreVertical } from "lucide-react";
+import { Video, VideoOff, Mic, MicOff, Phone, MoreVertical,Monitor, MonitorOff } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 interface MeetingControlsProps {
@@ -7,14 +7,21 @@ interface MeetingControlsProps {
   onEndCall: () => void;
   cameraEnabled?: boolean;
   micEnabled?: boolean;
+  isScreenSharing?: boolean; // <-- add this
+  onStartScreenShare?: () => void; // <-- add this
+  onStopScreenShare?: () => void;  // <-- add this
 }
+
 
 export default function MeetingControls({
   onToggleCamera,
   onToggleMicrophone,
   onEndCall,
   cameraEnabled,
-  micEnabled
+  micEnabled,
+  isScreenSharing,
+  onStartScreenShare,
+  onStopScreenShare
 }: MeetingControlsProps) {
   return (
     <div className="fixed bottom-4 md:bottom-6 left-1/2 transform -translate-x-1/2 z-50">
@@ -61,7 +68,24 @@ export default function MeetingControls({
         >
           <Phone className="h-4 w-4 md:h-5 md:w-5" />
         </Button>
-        
+        <Button
+          onClick={isScreenSharing ? onStopScreenShare : onStartScreenShare}
+          variant="ghost"
+          size="icon"
+          className={`w-10 h-10 md:w-12 md:h-12 rounded-full transition-all duration-200 ${
+            isScreenSharing
+              ? 'bg-blue-600 hover:bg-blue-700 text-white'
+              : 'bg-gray-700 hover:bg-gray-600 text-white'
+          }`}
+          aria-label={isScreenSharing ? "Stop screen sharing" : "Start screen sharing"}
+        >
+          {isScreenSharing ? (
+            <MonitorOff className="h-4 w-4 md:h-5 md:w-5" />
+          ) : (
+            <Monitor className="h-4 w-4 md:h-5 md:w-5" />
+          )}
+        </Button>
+
         <Button
           variant="ghost"
           size="icon"

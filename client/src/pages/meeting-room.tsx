@@ -43,7 +43,7 @@ export default function MeetingRoom() {
 
   // Initialize WebRTC connection
 
-  const { localStream, participants, cameraEnabled, micEnabled, toggleCamera, toggleMicrophone, endCall } = useSimpleWebRTC(meetingId!, userSettings);
+  const { localStream, participants, cameraEnabled, micEnabled, toggleCamera, toggleMicrophone, endCall, isScreenSharing,startScreenShare,stopScreenShare } = useSimpleWebRTC(meetingId!, userSettings);
   // console.log('participants', participants);
 
   const handleEndCall = () => {
@@ -182,6 +182,9 @@ export default function MeetingRoom() {
         onEndCall={handleEndCall}
         cameraEnabled={cameraEnabled}
         micEnabled={micEnabled}
+        isScreenSharing={isScreenSharing}
+        onStartScreenShare={startScreenShare}
+        onStopScreenShare={stopScreenShare}
       />
 
       {/* Invite Modal */}
