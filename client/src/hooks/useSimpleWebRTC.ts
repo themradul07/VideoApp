@@ -21,17 +21,37 @@ export function useSimpleWebRTC(meetingId: string, userSettings: any) {
   const peerConnections = useRef<Map<string, RTCPeerConnection>>(new Map());
   const isInitiator = useRef<boolean>(false);
 
+  function addTrackToPeers(track: MediaStreamTrack, localStream: MediaStream) {
+    // Add to local stream if not present
+    if (!localStream.getTracks().find(t => t.id === track.id)) {
+      localStream.addTrack(track);
+    }
+    // Add to all peer connections
+    peerConnections.current.forEach(pc => {
+      // Only add if not already sending this track
+      const alreadySending = pc.getSenders().some(sender => sender.track && sender.track.id === track.id);
+      if (!alreadySending) {
+        pc.addTrack(track, localStream);
+      }
+    });
+  }
+
   useEffect(() => {
     if (!meetingId || !userSettings) return;
 
     const initializeConnection = async () => {
       try {
         // Get user media
-        const stream = await navigator.mediaDevices.getUserMedia({
-          video: userSettings.cameraEnabled !== false,
-          audio: userSettings.micEnabled !== false
-        });
-
+        let stream;
+        if (userSettings.cameraEnabled !== false || userSettings.micEnabled !== false) {
+          stream = await navigator.mediaDevices.getUserMedia({
+            video: userSettings.cameraEnabled !== false,
+            audio: userSettings.micEnabled !== false
+          });
+        } else {
+          // Create an empty MediaStream if both are off
+          stream = new MediaStream();
+        }
         setLocalStream(stream);
         setCameraEnabled(userSettings.cameraEnabled !== false);
         setMicEnabled(userSettings.micEnabled !== false);
@@ -270,42 +290,53 @@ const sendMediaStateChange = (camera: boolean, mic: boolean) => {
   }
 };
 
-const toggleCamera = () => {
-  if (localStream) {
-    const videoTrack = localStream.getVideoTracks()[0];
-    if (videoTrack) {
-      videoTrack.enabled = !videoTrack.enabled;
-      setCameraEnabled(videoTrack.enabled);
+const toggleCamera = async () => {
+  if (!localStream) return;
 
-      // Update localStorage
-      const userSettings = JSON.parse(localStorage.getItem('videoMeetUser') || '{}');
-      userSettings.cameraEnabled = videoTrack.enabled;
-      localStorage.setItem('videoMeetUser', JSON.stringify(userSettings));
+  let videoTrack = localStream.getVideoTracks()[0];
 
-      // Send to backend
-      sendMediaStateChange(videoTrack.enabled, micEnabled);
-
-     
+  if (videoTrack) {
+    // Toggle enabled
+    videoTrack.enabled = !videoTrack.enabled;
+    setCameraEnabled(videoTrack.enabled);
+    sendMediaStateChange(videoTrack.enabled, micEnabled);
+  } else {
+    // No video track: get one and add it
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+      videoTrack = stream.getVideoTracks()[0];
+      addTrackToPeers(videoTrack, localStream);
+      setCameraEnabled(true);
+      sendMediaStateChange(true, micEnabled);
+    } catch (err) {
+      console.error("Error enabling camera:", err);
     }
   }
 };
 
-const toggleMicrophone = () => {
-  if (localStream) {
-    const audioTrack = localStream.getAudioTracks()[0];
-    if (audioTrack) {
-      audioTrack.enabled = !audioTrack.enabled;
-      setMicEnabled(audioTrack.enabled);
 
-      // Update localStorage
-      const userSettings = JSON.parse(localStorage.getItem('videoMeetUser') || '{}');
-      userSettings.micEnabled = audioTrack.enabled;
-      localStorage.setItem('videoMeetUser', JSON.stringify(userSettings));
+const toggleMicrophone = async () => {
+  if (!localStream) return;
 
-      sendMediaStateChange(cameraEnabled, audioTrack.enabled);
+  let audioTrack = localStream.getAudioTracks()[0];
+
+  if (audioTrack) {
+    audioTrack.enabled = !audioTrack.enabled;
+    setMicEnabled(audioTrack.enabled);
+    sendMediaStateChange(cameraEnabled, audioTrack.enabled);
+  } else {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      audioTrack = stream.getAudioTracks()[0];
+      addTrackToPeers(audioTrack, localStream);
+      setMicEnabled(true);
+      sendMediaStateChange(cameraEnabled, true);
+    } catch (err) {
+      console.error("Error enabling mic:", err);
     }
   }
 };
+
 
   const endCall = () => {
     // 1. Notify server and others
