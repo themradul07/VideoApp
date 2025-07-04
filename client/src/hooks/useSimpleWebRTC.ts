@@ -4,8 +4,8 @@ interface Participant {
   id: string;
   name: string;
   stream?: MediaStream;
-  cameraEnabled?: boolean;
-  micEnabled?: boolean;
+  cameraEnabled: false;
+  micEnabled: false;
 }
 
 export function useSimpleWebRTC(meetingId: string, userSettings: any) {
@@ -40,31 +40,42 @@ export function useSimpleWebRTC(meetingId: string, userSettings: any) {
 
         ws.onopen = () => {
           console.log("WebSocket connected");
+          console.log("userSettings:", userSettings);
           // Join the meeting room
           ws.send(JSON.stringify({
             type: 'join-room',
             meetingId,
             participantId: userSettings.participantId,
-            participantName: userSettings.displayName
+            participantName: userSettings.displayName,
+            cameraEnabled : userSettings.cameraEnabled !== false,
+            micEnabled: userSettings.micEnabled !== false
           }));
         };
+
+        
 
         ws.onmessage = async (event) => {
           const data = JSON.parse(event.data);
           console.log('Received message:', data);
+         
 
           switch (data.type) {
             case 'participant-joined':
               // New participant joined, initiate connection if we're already in the room
+              console.log('New participant joined:', data.participant);
               if (data.participant.id !== userSettings.participantId) {
                 await createPeerConnection(data.participant.id, stream, ws, true);
+        
                 setParticipants(prev => [...prev, data.participant]);
+                
               }
+           
               break;
 
             case 'room-participants':
               // Existing participants in the room
               setParticipants(data.participants.filter((p: any) => p.id !== userSettings.participantId));
+              
               // Create connections to existing participants
               for (const participant of data.participants) {
                 if (participant.id !== userSettings.participantId) {
@@ -88,6 +99,19 @@ export function useSimpleWebRTC(meetingId: string, userSettings: any) {
             case 'participant-left':
               handleParticipantLeft(data.participantId);
               break;
+
+            case 'participant-media-change':
+              // Update participant's media state
+              setParticipants(prev =>
+                prev.map(p =>
+                  p.id === data.participantId
+                    ? { ...p, cameraEnabled: data.cameraEnabled, micEnabled: data.micEnabled }
+                    : p
+                )
+              );
+              break;
+
+            
           }
         };
 
@@ -231,35 +255,86 @@ export function useSimpleWebRTC(meetingId: string, userSettings: any) {
     setParticipants(prev => prev.filter(p => p.id !== participantId));
   };
 
-  const toggleCamera = () => {
-    if (localStream) {
-      const videoTrack = localStream.getVideoTracks()[0];
-      if (videoTrack) {
-        videoTrack.enabled = !videoTrack.enabled;
-        setCameraEnabled(videoTrack.enabled);
+  // const toggleCamera = () => {
+  //   if (localStream) {
+  //     const videoTrack = localStream.getVideoTracks()[0];
+  //     if (videoTrack) {
+  //       videoTrack.enabled = !videoTrack.enabled;
+  //       setCameraEnabled(videoTrack.enabled);
 
-        // Update localStorage
-        const userSettings = JSON.parse(localStorage.getItem('videoMeetUser') || '{}');
-        userSettings.cameraEnabled = videoTrack.enabled;
-        localStorage.setItem('videoMeetUser', JSON.stringify(userSettings));
-      }
+  //       // Update localStorage
+  //       const userSettings = JSON.parse(localStorage.getItem('videoMeetUser') || '{}');
+  //       console.log("user settings", userSettings);
+  //       userSettings.cameraEnabled = videoTrack.enabled;
+  //       localStorage.setItem('videoMeetUser', JSON.stringify(userSettings));
+
+
+
+
+  //     }
+  //   }
+  // };
+
+  // const toggleMicrophone = () => {
+  //   if (localStream) {
+  //     const audioTrack = localStream.getAudioTracks()[0];
+  //     if (audioTrack) {
+  //       audioTrack.enabled = !audioTrack.enabled;
+  //       setMicEnabled(audioTrack.enabled);
+
+  //       // Update localStorage
+  //       const userSettings = JSON.parse(localStorage.getItem('videoMeetUser') || '{}');
+  //       userSettings.micEnabled = audioTrack.enabled;
+  //       localStorage.setItem('videoMeetUser', JSON.stringify(userSettings));
+  //     }
+  //   }
+  // };
+const sendMediaStateChange = (camera: boolean, mic: boolean) => {
+  if (socket) {
+    socket.send(JSON.stringify({
+      type: 'media-state-change',
+      participantId: userSettings.participantId,
+      cameraEnabled: camera,
+      micEnabled: mic
+    }));
+  }
+};
+
+const toggleCamera = () => {
+  if (localStream) {
+    const videoTrack = localStream.getVideoTracks()[0];
+    if (videoTrack) {
+      videoTrack.enabled = !videoTrack.enabled;
+      setCameraEnabled(videoTrack.enabled);
+
+      // Update localStorage
+      const userSettings = JSON.parse(localStorage.getItem('videoMeetUser') || '{}');
+      userSettings.cameraEnabled = videoTrack.enabled;
+      localStorage.setItem('videoMeetUser', JSON.stringify(userSettings));
+
+      // Send to backend
+      sendMediaStateChange(videoTrack.enabled, micEnabled);
     }
-  };
+  }
+};
 
-  const toggleMicrophone = () => {
-    if (localStream) {
-      const audioTrack = localStream.getAudioTracks()[0];
-      if (audioTrack) {
-        audioTrack.enabled = !audioTrack.enabled;
-        setMicEnabled(audioTrack.enabled);
+const toggleMicrophone = () => {
+  if (localStream) {
+    const audioTrack = localStream.getAudioTracks()[0];
+    if (audioTrack) {
+      audioTrack.enabled = !audioTrack.enabled;
+      setMicEnabled(audioTrack.enabled);
 
-        // Update localStorage
-        const userSettings = JSON.parse(localStorage.getItem('videoMeetUser') || '{}');
-        userSettings.micEnabled = audioTrack.enabled;
-        localStorage.setItem('videoMeetUser', JSON.stringify(userSettings));
-      }
+      // Update localStorage
+      const userSettings = JSON.parse(localStorage.getItem('videoMeetUser') || '{}');
+      userSettings.micEnabled = audioTrack.enabled;
+      localStorage.setItem('videoMeetUser', JSON.stringify(userSettings));
+
+      // Send to backend
+      sendMediaStateChange(cameraEnabled, audioTrack.enabled);
     }
-  };
+  }
+};
 
   const endCall = () => {
     if (localStream) {

@@ -9,6 +9,8 @@ interface WebSocketClient extends WebSocket {
   meetingId?: string;
   participantId?: string;
   participantName?: string;
+  cameraEnabled?: boolean;
+  micEnabled?: boolean;
 }
 
 export async function registerRoutes(app: Express): Promise<Server> {
@@ -39,6 +41,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ error: "Meeting room not found" });
       }
       res.json(room);
+      
     } catch (error) {
       res.status(500).json({ error: "Failed to get meeting room" });
     }
@@ -115,10 +118,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         
         switch (data.type) {
           case 'join-room':
-            const { meetingId, participantId, participantName } = data;
+            const { meetingId, participantId, participantName , cameraEnabled, micEnabled } = data;
+            console.log(`Participant ${participantId} joining room ${meetingId}`, data);
             ws.meetingId = meetingId;
             ws.participantId = participantId;
             ws.participantName = participantName;
+            ws.cameraEnabled = cameraEnabled;
+            ws.micEnabled = micEnabled;
             
             if (!rooms.has(meetingId)) {
               rooms.set(meetingId, new Set());
@@ -128,18 +134,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
             // Notify other participants
             broadcastToRoom(meetingId, {
               type: 'participant-joined',
-              participant: { id: participantId, name: participantName }
+              participant: { id: participantId, name: participantName , cameraEnabled, micEnabled }
             }, ws);
             
             // Send current participants to new user
             const roomClients = rooms.get(meetingId);
             if (roomClients) {
+            
               const participants = Array.from(roomClients)
                 .filter(client => client !== ws && client.participantId)
                 .map(client => ({
                   id: client.participantId,
-                  name: client.participantName
+                  name: client.participantName,
+                  cameraEnabled: client.cameraEnabled,
+                  micEnabled: client.micEnabled
                 }));
+                
               
               ws.send(JSON.stringify({
                 type: 'room-participants',
@@ -163,6 +173,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
           case 'media-state-change':
             // Broadcast media state changes (mute/unmute, camera on/off)
+            console.log(`Participant ${ws.participantId} changed media state`, data);
             broadcastToRoom(ws.meetingId!, {
               type: 'participant-media-change',
               participantId: ws.participantId,
