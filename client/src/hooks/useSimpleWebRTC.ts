@@ -8,6 +8,22 @@ interface Participant {
   micEnabled?: boolean;
 }
 
+function createSilentAudioTrack() {
+  const ctx = new AudioContext();
+  const oscillator = ctx.createOscillator();
+  const dst = oscillator.connect(ctx.createMediaStreamDestination());
+  oscillator.start();
+  return dst.stream.getAudioTracks()[0];
+}
+
+function createBlackVideoTrack() {
+  const canvas = Object.assign(document.createElement("canvas"), { width: 640, height: 480 });
+  const ctx = canvas.getContext("2d");
+  if (ctx) ctx.fillRect(0, 0, canvas.width, canvas.height);
+  const stream = canvas.captureStream();
+  return stream.getVideoTracks()[0];
+}
+
 export function useSimpleWebRTC(meetingId: string, userSettings: any) {
   const [localStream, setLocalStream] = useState<MediaStream | null>(null);
   const [participants, setParticipants] = useState<Participant[]>([]);
@@ -16,31 +32,34 @@ export function useSimpleWebRTC(meetingId: string, userSettings: any) {
   const [socket, setSocket] = useState<WebSocket | null>(null);
 
   const peerConnections = useRef<Map<string, RTCPeerConnection>>(new Map());
-  const isInitiator = useRef<boolean>(false);
 
   useEffect(() => {
     if (!meetingId || !userSettings) return;
 
     const initializeConnection = async () => {
       try {
-        // Get user media
-        const stream = await navigator.mediaDevices.getUserMedia({
-          video: userSettings.cameraEnabled !== false,
-          audio: userSettings.micEnabled !== false
-        });
+        let stream: MediaStream;
+
+        if (!userSettings.cameraEnabled && !userSettings.micEnabled) {
+          stream = new MediaStream();
+          stream.addTrack(createBlackVideoTrack());
+          stream.addTrack(createSilentAudioTrack());
+        } else {
+          stream = await navigator.mediaDevices.getUserMedia({
+            video: userSettings.cameraEnabled !== false,
+            audio: userSettings.micEnabled !== false
+          });
+        }
 
         setLocalStream(stream);
         setCameraEnabled(userSettings.cameraEnabled !== false);
         setMicEnabled(userSettings.micEnabled !== false);
 
-        // Initialize WebSocket
         const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
         const wsUrl = `${protocol}//${window.location.host}/ws`;
         const ws = new WebSocket(wsUrl);
 
         ws.onopen = () => {
-          console.log("WebSocket connected");
-          // Join the meeting room
           ws.send(JSON.stringify({
             type: 'join-room',
             meetingId,
@@ -51,11 +70,8 @@ export function useSimpleWebRTC(meetingId: string, userSettings: any) {
 
         ws.onmessage = async (event) => {
           const data = JSON.parse(event.data);
-          console.log('Received message:', data);
-
           switch (data.type) {
             case 'participant-joined':
-              // New participant joined, initiate connection if we're already in the room
               if (data.participant.id !== userSettings.participantId) {
                 await createPeerConnection(data.participant.id, stream, ws, true);
                 setParticipants(prev => [...prev, data.participant]);
@@ -63,13 +79,10 @@ export function useSimpleWebRTC(meetingId: string, userSettings: any) {
               break;
 
             case 'room-participants':
-              // Existing participants in the room
-              setParticipants(data.participants.filter((p: any) => p.id !== userSettings.participantId));
-              // Create connections to existing participants
-              for (const participant of data.participants) {
-                if (participant.id !== userSettings.participantId) {
-                  await createPeerConnection(participant.id, stream, ws, false);
-                }
+              const others = data.participants.filter((p: any) => p.id !== userSettings.participantId);
+              setParticipants(others);
+              for (const participant of others) {
+                await createPeerConnection(participant.id, stream, ws, false);
               }
               break;
 
@@ -92,29 +105,22 @@ export function useSimpleWebRTC(meetingId: string, userSettings: any) {
         };
 
         setSocket(ws);
-
       } catch (error) {
-        console.error("Error initializing WebRTC:", error);
+        console.error("WebRTC Initialization Error:", error);
       }
     };
 
     initializeConnection();
 
     return () => {
-      // Cleanup
       peerConnections.current.forEach(pc => pc.close());
       peerConnections.current.clear();
-      if (localStream) {
-        localStream.getTracks().forEach(track => track.stop());
-      }
-      if (socket) {
-        socket.close();
-      }
+      localStream?.getTracks().forEach(track => track.stop());
+      socket?.close();
     };
   }, [meetingId, userSettings]);
 
   const createPeerConnection = async (participantId: string, stream: MediaStream, ws: WebSocket, initiator: boolean) => {
-
     const pc = new RTCPeerConnection({
       iceServers: [
         { urls: 'stun:stun.l.google.com:19302' },
@@ -128,25 +134,17 @@ export function useSimpleWebRTC(meetingId: string, userSettings: any) {
       ]
     });
 
-    // Add local stream
     stream.getTracks().forEach(track => {
       pc.addTrack(track, stream);
     });
 
-    // Handle incoming stream
     pc.ontrack = (event) => {
-      console.log('Received remote stream from', participantId);
       const remoteStream = event.streams[0];
       setParticipants(prev =>
-        prev.map(p =>
-          p.id === participantId
-            ? { ...p, stream: remoteStream }
-            : p
-        )
+        prev.map(p => (p.id === participantId ? { ...p, stream: remoteStream } : p))
       );
     };
 
-    // Handle ICE candidates
     pc.onicecandidate = (event) => {
       if (event.candidate) {
         ws.send(JSON.stringify({
@@ -159,66 +157,43 @@ export function useSimpleWebRTC(meetingId: string, userSettings: any) {
 
     peerConnections.current.set(participantId, pc);
 
-    // If we're the initiator, create and send offer
     if (initiator) {
-      try {
-        const offer = await pc.createOffer();
-        await pc.setLocalDescription(offer);
-        ws.send(JSON.stringify({
-          type: 'webrtc-offer',
-          targetId: participantId,
-          offer: offer
-        }));
-      } catch (error) {
-        console.error('Error creating offer:', error);
-      }
+      const offer = await pc.createOffer();
+      await pc.setLocalDescription(offer);
+      ws.send(JSON.stringify({
+        type: 'webrtc-offer',
+        targetId: participantId,
+        offer
+      }));
     }
   };
 
   const handleOffer = async (fromId: string, offer: RTCSessionDescriptionInit, stream: MediaStream, ws: WebSocket) => {
-    let pc = peerConnections.current.get(fromId);
-
-    if (!pc) {
-      await createPeerConnection(fromId, stream, ws, false);
-      pc = peerConnections.current.get(fromId);
-    }
-
+    await createPeerConnection(fromId, stream, ws, false);
+    const pc = peerConnections.current.get(fromId);
     if (pc) {
-      try {
-        await pc.setRemoteDescription(offer);
-        const answer = await pc.createAnswer();
-        await pc.setLocalDescription(answer);
-
-        ws.send(JSON.stringify({
-          type: 'webrtc-answer',
-          targetId: fromId,
-          answer: answer
-        }));
-      } catch (error) {
-        console.error('Error handling offer:', error);
-      }
+      await pc.setRemoteDescription(offer);
+      const answer = await pc.createAnswer();
+      await pc.setLocalDescription(answer);
+      ws.send(JSON.stringify({
+        type: 'webrtc-answer',
+        targetId: fromId,
+        answer
+      }));
     }
   };
 
   const handleAnswer = async (fromId: string, answer: RTCSessionDescriptionInit) => {
     const pc = peerConnections.current.get(fromId);
     if (pc) {
-      try {
-        await pc.setRemoteDescription(answer);
-      } catch (error) {
-        console.error('Error handling answer:', error);
-      }
+      await pc.setRemoteDescription(answer);
     }
   };
 
   const handleIceCandidate = async (fromId: string, candidate: RTCIceCandidateInit) => {
     const pc = peerConnections.current.get(fromId);
     if (pc) {
-      try {
-        await pc.addIceCandidate(candidate);
-      } catch (error) {
-        console.error('Error adding ICE candidate:', error);
-      }
+      await pc.addIceCandidate(candidate);
     }
   };
 
@@ -237,11 +212,9 @@ export function useSimpleWebRTC(meetingId: string, userSettings: any) {
       if (videoTrack) {
         videoTrack.enabled = !videoTrack.enabled;
         setCameraEnabled(videoTrack.enabled);
-
-        // Update localStorage
-        const userSettings = JSON.parse(localStorage.getItem('videoMeetUser') || '{}');
-        userSettings.cameraEnabled = videoTrack.enabled;
-        localStorage.setItem('videoMeetUser', JSON.stringify(userSettings));
+        const settings = JSON.parse(localStorage.getItem('videoMeetUser') || '{}');
+        settings.cameraEnabled = videoTrack.enabled;
+        localStorage.setItem('videoMeetUser', JSON.stringify(settings));
       }
     }
   };
@@ -252,19 +225,15 @@ export function useSimpleWebRTC(meetingId: string, userSettings: any) {
       if (audioTrack) {
         audioTrack.enabled = !audioTrack.enabled;
         setMicEnabled(audioTrack.enabled);
-
-        // Update localStorage
-        const userSettings = JSON.parse(localStorage.getItem('videoMeetUser') || '{}');
-        userSettings.micEnabled = audioTrack.enabled;
-        localStorage.setItem('videoMeetUser', JSON.stringify(userSettings));
+        const settings = JSON.parse(localStorage.getItem('videoMeetUser') || '{}');
+        settings.micEnabled = audioTrack.enabled;
+        localStorage.setItem('videoMeetUser', JSON.stringify(settings));
       }
     }
   };
 
   const endCall = () => {
-    if (localStream) {
-      localStream.getTracks().forEach(track => track.stop());
-    }
+    localStream?.getTracks().forEach(track => track.stop());
     setLocalStream(null);
     setParticipants([]);
     peerConnections.current.forEach(pc => pc.close());
