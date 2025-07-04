@@ -14,6 +14,9 @@ export function useSimpleWebRTC(meetingId: string, userSettings: any) {
   const [cameraEnabled, setCameraEnabled] = useState(true);
   const [micEnabled, setMicEnabled] = useState(true);
   const [socket, setSocket] = useState<WebSocket | null>(null);
+  const [isScreenSharing, setIsScreenSharing] = useState(false);
+  const [screenStream, setScreenStream] = useState<MediaStream | null>(null);
+
 
   const peerConnections = useRef<Map<string, RTCPeerConnection>>(new Map());
   const isInitiator = useRef<boolean>(false);
@@ -314,6 +317,70 @@ const toggleMicrophone = () => {
     peerConnections.current.clear();
   };
 
+
+  // Start screen sharing
+const startScreenShare = async () => {
+  try {
+    const displayStream = await navigator.mediaDevices.getDisplayMedia({ video: true });
+    setScreenStream(displayStream);
+    setIsScreenSharing(true);
+
+    // Replace the video track in all peer connections
+    const screenTrack = displayStream.getVideoTracks()[0];
+    peerConnections.current.forEach((pc) => {
+      const senders = pc.getSenders().filter(s => s.track && s.track.kind === 'video');
+      if (senders.length > 0) {
+        senders[0].replaceTrack(screenTrack);
+      }
+    });
+
+    // Replace local video track for local preview
+    setLocalStream((prev) => {
+      if (!prev) return prev;
+      const newStream = new MediaStream([
+        screenTrack,
+        ...prev.getAudioTracks()
+      ]);
+      return newStream;
+    });
+
+    // When user stops sharing from browser UI
+    screenTrack.onended = () => {
+      stopScreenShare();
+    };
+  } catch (err) {
+    console.error("Error sharing screen:", err);
+  }
+};
+
+// Stop screen sharing and revert to camera
+const stopScreenShare = async () => {
+  if (screenStream) {
+    screenStream.getTracks().forEach(track => track.stop());
+    setScreenStream(null);
+  }
+  setIsScreenSharing(false);
+
+  // Get camera again
+  const cameraStream = await navigator.mediaDevices.getUserMedia({
+    video: cameraEnabled,
+    audio: micEnabled,
+  });
+
+  // Replace the video track in all peer connections
+  const cameraTrack = cameraStream.getVideoTracks()[0];
+  peerConnections.current.forEach((pc) => {
+    const senders = pc.getSenders().filter(s => s.track && s.track.kind === 'video');
+    if (senders.length > 0) {
+      senders[0].replaceTrack(cameraTrack);
+    }
+  });
+
+  // Update local stream for preview
+  setLocalStream(cameraStream);
+};
+
+
   return {
     localStream,
     participants,
@@ -321,6 +388,9 @@ const toggleMicrophone = () => {
     micEnabled,
     toggleCamera,
     toggleMicrophone,
-    endCall
+    endCall,
+    isScreenSharing,
+    startScreenShare,
+    stopScreenShare,
   };
 }
