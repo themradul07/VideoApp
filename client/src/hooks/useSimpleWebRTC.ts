@@ -4,8 +4,8 @@ interface Participant {
   id: string;
   name: string;
   stream?: MediaStream;
-  cameraEnabled: false;
-  micEnabled: false;
+  cameraEnabled?: boolean;
+  micEnabled?: boolean;
 }
 
 export function useSimpleWebRTC(meetingId: string, userSettings: any) {
@@ -40,7 +40,7 @@ export function useSimpleWebRTC(meetingId: string, userSettings: any) {
 
         ws.onopen = () => {
           console.log("WebSocket connected");
-          console.log("userSettings:", userSettings);
+          
           // Join the meeting room
           ws.send(JSON.stringify({
             type: 'join-room',
@@ -255,40 +255,7 @@ export function useSimpleWebRTC(meetingId: string, userSettings: any) {
     setParticipants(prev => prev.filter(p => p.id !== participantId));
   };
 
-  // const toggleCamera = () => {
-  //   if (localStream) {
-  //     const videoTrack = localStream.getVideoTracks()[0];
-  //     if (videoTrack) {
-  //       videoTrack.enabled = !videoTrack.enabled;
-  //       setCameraEnabled(videoTrack.enabled);
-
-  //       // Update localStorage
-  //       const userSettings = JSON.parse(localStorage.getItem('videoMeetUser') || '{}');
-  //       console.log("user settings", userSettings);
-  //       userSettings.cameraEnabled = videoTrack.enabled;
-  //       localStorage.setItem('videoMeetUser', JSON.stringify(userSettings));
-
-
-
-
-  //     }
-  //   }
-  // };
-
-  // const toggleMicrophone = () => {
-  //   if (localStream) {
-  //     const audioTrack = localStream.getAudioTracks()[0];
-  //     if (audioTrack) {
-  //       audioTrack.enabled = !audioTrack.enabled;
-  //       setMicEnabled(audioTrack.enabled);
-
-  //       // Update localStorage
-  //       const userSettings = JSON.parse(localStorage.getItem('videoMeetUser') || '{}');
-  //       userSettings.micEnabled = audioTrack.enabled;
-  //       localStorage.setItem('videoMeetUser', JSON.stringify(userSettings));
-  //     }
-  //   }
-  // };
+  
 const sendMediaStateChange = (camera: boolean, mic: boolean) => {
   if (socket) {
     socket.send(JSON.stringify({

@@ -138,7 +138,7 @@ export default function MeetingRoom() {
           
           {/* Remote videos */}
           {participants.map((participant) => (
-            console.log('participant', participant),
+            
 
             <VideoTile
               key={participant.id}

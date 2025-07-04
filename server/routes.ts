@@ -119,7 +119,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         switch (data.type) {
           case 'join-room':
             const { meetingId, participantId, participantName , cameraEnabled, micEnabled } = data;
-            console.log(`Participant ${participantId} joining room ${meetingId}`, data);
             ws.meetingId = meetingId;
             ws.participantId = participantId;
             ws.participantName = participantName;
@@ -173,7 +172,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
           case 'media-state-change':
             // Broadcast media state changes (mute/unmute, camera on/off)
-            console.log(`Participant ${ws.participantId} changed media state`, data);
+            
             broadcastToRoom(ws.meetingId!, {
               type: 'participant-media-change',
               participantId: ws.participantId,
