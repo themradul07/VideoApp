@@ -173,6 +173,20 @@ export function useSimpleWebRTC(meetingId: string, userSettings: any) {
               );
               break;
 
+            case 'shared-screen-toogle':
+              // Handle screen sharing toggle
+              console.log('Screen sharing toggle received:', data);
+              setParticipants(prev =>
+                prev.map(p =>
+                  p.id === data.participantId
+                    ? { ...p, screenEnabled: data.screenEnabled }
+                    : p
+                )
+              );
+              break;
+
+           
+
             
           }
         };
@@ -201,19 +215,19 @@ export function useSimpleWebRTC(meetingId: string, userSettings: any) {
 
   const createPeerConnection = async (participantId: string, stream: MediaStream, ws: WebSocket, initiator: boolean, iceServers: RTCIceServer[]) => {
 
-    // const pc = new RTCPeerConnection({
-    //   iceServers: [
-    //     { urls: 'stun:stun.l.google.com:19302' },
-    //     { urls: 'stun:stun1.l.google.com:19302' },
-    //     { urls: 'stun:stun2.l.google.com:3478' },
-    //     {
-    //       urls: 'turn:0.tcp.in.ngrok.io:12035?transport=tcp',
-    //       username: 'testuser',
-    //       credential: 'testpassword'
-    //     },
-    //   ]
-    // });
-     const pc = new RTCPeerConnection({ iceServers });
+    const pc = new RTCPeerConnection({
+      iceServers: [
+        { urls: 'stun:stun.l.google.com:19302' },
+        { urls: 'stun:stun1.l.google.com:19302' },
+        { urls: 'stun:stun2.l.google.com:3478' },
+        {
+          urls: 'turn:0.tcp.in.ngrok.io:12035?transport=tcp',
+          username: 'testuser',
+          credential: 'testpassword'
+        },
+      ]
+    });
+    //  const pc = new RTCPeerConnection({ iceServers });
 
     // Add local stream
     stream.getTracks().forEach(track => {
@@ -330,6 +344,17 @@ const sendMediaStateChange = (camera: boolean, mic: boolean) => {
   }
 };
 
+//create a function to send details to backend of screen shared
+const sendScreenShareState = (screenEnabled: boolean) => {
+  if (socket) {
+    socket.send(JSON.stringify({
+      type: 'shared-screen',
+      participantId: userSettings.participantId,
+      screenEnabled: screenEnabled
+    }));
+  }
+};
+
 const toggleCamera = async () => {
   if (!localStream) return;
 
@@ -417,6 +442,7 @@ const startScreenShare = async () => {
     const displayStream = await navigator.mediaDevices.getDisplayMedia({ video: true });
     setScreenStream(displayStream);
     setIsScreenSharing(true);
+    
 
     // Replace the video track in all peer connections
     const screenTrack = displayStream.getVideoTracks()[0];
@@ -441,6 +467,16 @@ const startScreenShare = async () => {
     screenTrack.onended = () => {
       stopScreenShare();
     };
+    if(socket){
+      socket.send(JSON.stringify({
+        type: 'shared-screen',
+        participantId: userSettings.participantId,
+        screenEnabled: true
+      }));
+
+      
+    }
+
   } catch (err) {
     console.error("Error sharing screen:", err);
   }
@@ -471,6 +507,15 @@ const stopScreenShare = async () => {
 
   // Update local stream for preview
   setLocalStream(cameraStream);
+   //update th backend as well
+    if(socket){
+      socket.send(JSON.stringify({
+        type: 'shared-screen',
+        participantId: userSettings.participantId,
+        screenEnabled: false
+      }));
+    }
+
 };
 
 

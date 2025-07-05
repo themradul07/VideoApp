@@ -206,6 +206,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
               micEnabled: data.micEnabled
             }, ws);
             break;
+
+          case 'shared-screen':
+            // Handle screen sharing
+            
+            broadcastToRoom(ws.meetingId!, {
+              type: 'shared-screen-toogle',
+              participantId: ws.participantId,
+              screenEnabled: data.screenEnabled
+            }, ws);
         }
       } catch (error) {
         console.error('WebSocket message error:', error);

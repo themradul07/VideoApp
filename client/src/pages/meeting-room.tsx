@@ -149,28 +149,36 @@ export default function MeetingRoom() {
           }}
         >
           {/* Local video */}
-          <VideoTile
-            stream={localStream}
-            participantName={userSettings?.displayName || "You"}
-            isLocal={true}
-            cameraEnabled={cameraEnabled}
-            micEnabled={micEnabled}
-            showName={true}
-          />
+          <div className={isScreenSharing ? "md:col-span-2 md:row-span-2" : ""}>
+
+            <VideoTile
+              stream={localStream}
+              participantName={userSettings?.displayName || "You"}
+              isLocal={true}
+              cameraEnabled={cameraEnabled}
+              micEnabled={micEnabled}
+              showName={true}
+            />
+          </div>
 
           {/* Remote videos */}
           {participants.map((participant) => (
             
+            <div
+              className={participant.screenEnabled ? "md:col-span-2 md:row-span-2 order-first" : ""}
 
-            <VideoTile
-              key={participant.id}
-              stream={participant.stream}
-              participantName={participant.name}
-              isLocal={false}
-              cameraEnabled={participant.cameraEnabled}
-              micEnabled={participant.micEnabled}
-              showName={true}
-            />
+            >
+              <VideoTile
+
+                key={participant.id}
+                stream={participant.stream}
+                participantName={participant.name}
+                isLocal={false}
+                cameraEnabled={participant.cameraEnabled}
+                micEnabled={participant.micEnabled}
+                showName={true}
+              />
+            </div>
           ))}
         </div>
       </main>
