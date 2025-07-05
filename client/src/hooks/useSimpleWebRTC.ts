@@ -215,19 +215,19 @@ export function useSimpleWebRTC(meetingId: string, userSettings: any) {
 
   const createPeerConnection = async (participantId: string, stream: MediaStream, ws: WebSocket, initiator: boolean, iceServers: RTCIceServer[]) => {
 
-    const pc = new RTCPeerConnection({
-      iceServers: [
-        { urls: 'stun:stun.l.google.com:19302' },
-        { urls: 'stun:stun1.l.google.com:19302' },
-        { urls: 'stun:stun2.l.google.com:3478' },
-        {
-          urls: 'turn:0.tcp.in.ngrok.io:12035?transport=tcp',
-          username: 'testuser',
-          credential: 'testpassword'
-        },
-      ]
-    });
-    //  const pc = new RTCPeerConnection({ iceServers });
+    // const pc = new RTCPeerConnection({
+    //   iceServers: [
+    //     { urls: 'stun:stun.l.google.com:19302' },
+    //     { urls: 'stun:stun1.l.google.com:19302' },
+    //     { urls: 'stun:stun2.l.google.com:3478' },
+    //     {
+    //       urls: 'turn:0.tcp.in.ngrok.io:12035?transport=tcp',
+    //       username: 'testuser',
+    //       credential: 'testpassword'
+    //     },
+    //   ]
+    // });
+     const pc = new RTCPeerConnection({ iceServers });
 
     // Add local stream
     stream.getTracks().forEach(track => {
