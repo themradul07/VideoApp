@@ -113,24 +113,32 @@ export default function MeetingRoom() {
         {/* Mobile: Column layout */}
         <div className="flex flex-col gap-2 h-full md:hidden overflow-y-auto">
           {/* Local video */}
-          <VideoTile 
-            stream={localStream}
-            participantName={userSettings?.displayName || "You"}
-            isLocal={true}
-            cameraEnabled={cameraEnabled}
-            micEnabled={micEnabled}
-          />
+          <div className={isScreenSharing ? "md:col-span-2 md:row-span-2" : ""}>
+
+            <VideoTile
+              stream={localStream}
+              participantName={userSettings?.displayName || "You"}
+              isLocal={true}
+              cameraEnabled={cameraEnabled}
+              micEnabled={micEnabled}
+            />
+          </div>
 
           {/* Remote videos */}
           {participants.map((participant) => (
-            <VideoTile
-              key={participant.id}
-              stream={participant.stream}
-              participantName={participant.name}
-              isLocal={false}
-              cameraEnabled={participant.cameraEnabled}
-              micEnabled={participant.micEnabled}
-            />
+            <div
+              className={participant.screenEnabled ? "row-span-2 order-first" : ""}
+
+            >
+              <VideoTile
+                key={participant.id}
+                stream={participant.stream}
+                participantName={participant.name}
+                isLocal={false}
+                cameraEnabled={participant.cameraEnabled}
+                micEnabled={participant.micEnabled}
+              />
+            </div>
           ))}
         </div>
 
