@@ -111,7 +111,7 @@ export default function MeetingRoom() {
       {/* Video Grid */}
       <main className="flex-1 p-2 md:p-4 overflow-hidden">
         {/* Mobile: Column layout */}
-        <div className="flex flex-col gap-2 h-full md:hidden overflow-y-auto">
+        <div className="flex  flex-col gap-1 h-0  md:hidden overflow-y-scroll">
           {/* Local video */}
           <VideoTile 
             stream={localStream}
@@ -155,7 +155,7 @@ export default function MeetingRoom() {
             isLocal={true}
             cameraEnabled={cameraEnabled}
             micEnabled={micEnabled}
-            showName={true}
+
           />
 
           {/* Remote videos */}
@@ -169,7 +169,7 @@ export default function MeetingRoom() {
               isLocal={false}
               cameraEnabled={participant.cameraEnabled}
               micEnabled={participant.micEnabled}
-              showName={true}
+              
             />
           ))}
         </div>
