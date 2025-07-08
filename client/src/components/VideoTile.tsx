@@ -1,5 +1,5 @@
-import { useEffect, useRef } from "react";
-import { Video, VideoOff, Mic, MicOff } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { Video, VideoOff, Mic, MicOff, Fullscreen } from "lucide-react";
 
 interface VideoTileProps {
   stream?: MediaStream | null;
@@ -16,6 +16,7 @@ export default function VideoTile({
   cameraEnabled = true, 
   micEnabled = true 
 }: VideoTileProps) {
+  const [ishovered, setishovered] = useState(false)
   const videoRef = useRef<HTMLVideoElement>(null);
 
   useEffect(() => {
@@ -32,6 +33,36 @@ export default function VideoTile({
     return name.split(' ').map(n => n[0]).join('').toUpperCase();
   };
 
+
+  const handleFullscreen = () => {
+    if (videoRef.current) {
+      if (videoRef.current.requestFullscreen) {
+        videoRef.current.requestFullscreen();
+      }
+      // } else if (videoRef.current.mozRequestFullScreen) { /* Firefox */
+      //   videoRef.current.mozRequestFullScreen();
+      // } else if (videoRef.current.webkitRequestFullscreen) { /* Chrome, Safari & Opera */
+      //   videoRef.current.webkitRequestFullscreen();
+      // } else if (videoRef.current.msRequestFullscreen) { /* IE/Edge */
+      //   videoRef.current.msRequestFullscreen();
+      // }
+    }
+  };
+
+  const handleClick = async () => {
+    console.log("VideoTile clicked");
+
+    // Immediately set isHovered to false
+    setishovered(true);
+
+    // Then set it to true after 3 seconds
+    setTimeout(() => {
+      setishovered(false);
+    }, 3000);
+  };
+
+
+
   const getAvatarColor = (name: string) => {
     const colors = [
       'bg-blue-600', 'bg-green-600', 'bg-purple-600', 
@@ -42,7 +73,7 @@ export default function VideoTile({
   };
 
   return (
-    <div className="relative bg-gray-800 rounded-lg overflow-hidden aspect-video border border-gray-700/50 min-h-0 md:min-h-[200px]">
+    <div onClick={handleClick} className="relative bg-gray-800 rounded-lg overflow-hidden aspect-video border border-gray-700/50 min-h-0 md:min-h-[200px]">
       {stream && cameraEnabled ? (
         <video
           ref={videoRef}
@@ -86,6 +117,11 @@ export default function VideoTile({
               <VideoOff className="text-white w-2.5 h-2.5 md:w-3 md:h-3" />
             )}
           </div>
+          {ishovered &&
+            <div onClick={handleFullscreen} className={`w-5 h-5 md:w-6 none md:h-6 rounded-full flex items-center justify-center bg-black `}>
+
+              <Fullscreen className="text-white w-2.5 h-2.5 md:w-3 md:h-3" />
+            </div>}
         </div>
       </div>
     </div>
