@@ -1,5 +1,6 @@
 import { Video, VideoOff, Mic, MicOff, Phone, MoreVertical,Monitor, MonitorOff } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useEffect, useState } from "react";
 
 interface MeetingControlsProps {
   onToggleCamera: () => void;
@@ -23,6 +24,20 @@ export default function MeetingControls({
   onStartScreenShare,
   onStopScreenShare
 }: MeetingControlsProps) {
+  
+
+  const [isMobileOrTablet, setIsMobileOrTablet] = useState<boolean>(false);
+  useEffect(() => {
+    const checkDevice = (): boolean => {
+      const ua = navigator.userAgent;
+      const width = window.innerWidth;
+      return /Mobi|Android|iPhone|iPod|Tablet|iPad/i.test(ua) || width <= 1024;
+    };
+
+     const result = checkDevice();
+    setIsMobileOrTablet(result);
+  }, []);
+
   return (
     <div className="fixed bottom-4 md:bottom-6 left-1/2 transform -translate-x-1/2 z-50">
       <div className="bg-gray-800/90 backdrop-blur-sm rounded-full px-4 md:px-6 py-2 md:py-3 flex items-center space-x-2 md:space-x-4 shadow-lg border border-gray-700/50">
@@ -76,7 +91,7 @@ export default function MeetingControls({
             isScreenSharing
               ? 'bg-blue-600 hover:bg-blue-700 text-white'
               : 'bg-gray-700 hover:bg-gray-600 text-white'
-          }`}
+          } ${isMobileOrTablet && 'hidden'} ` }
           aria-label={isScreenSharing ? "Stop screen sharing" : "Start screen sharing"}
         >
           {isScreenSharing ? (

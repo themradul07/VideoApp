@@ -57,17 +57,21 @@ app.use((req, res, next) => {
   }
 
   // Use Render's PORT environment variable, fallback to 5000 for development
-  const port = process.env.PORT || 5000;
-  server.listen({
-    port,
-    host: "0.0.0.0",
+  // const port = process.env.PORT || 5002;
+  // server.listen({
+  //   port,
+  //   // host: "0.0.0.0",
+  //   host: "127.0.0.1",
     
-    reusePort: true,
-  }, () => {
-    log(`serving on port ${port}`);
+  //   reusePort: true,
+  // }, () => {
+  //   log(`serving on port ${port}`);
 
 
-  });
+  // });
+  server.listen(5001, "127.0.0.1", () => {
+  log(`serving on port ${5001}`);
+});
 
 //   server.listen(5000, '127.0.0.1', () => {
 //   console.log('Server running...');

@@ -111,7 +111,7 @@ export default function MeetingRoom() {
       {/* Video Grid */}
       <main className="flex-1 p-2 md:p-4 overflow-hidden">
         {/* Mobile: Column layout */}
-        <div className="flex flex-col gap-2 h-full md:hidden overflow-y-auto">
+        <div className="flex  flex-col gap-1 h-0  md:hidden overflow-y-scroll">
           {/* Local video */}
           <div className={isScreenSharing ? "md:col-span-2 md:row-span-2" : ""}>
 
@@ -157,6 +157,7 @@ export default function MeetingRoom() {
           }}
         >
           {/* Local video */}
+
           <div className={isScreenSharing ? "md:col-span-2 md:row-span-2" : ""}>
 
             <VideoTile
@@ -166,6 +167,7 @@ export default function MeetingRoom() {
               cameraEnabled={cameraEnabled}
               micEnabled={micEnabled}
               showName={true}
+
             />
           </div>
 
