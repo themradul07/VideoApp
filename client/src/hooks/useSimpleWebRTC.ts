@@ -361,12 +361,12 @@ const toggleCamera = async () => {
   let videoTrack = localStream.getVideoTracks()[0];
 
   if (videoTrack) {
-    // Toggle enabled
+    // Toggle enabled property only
     videoTrack.enabled = !videoTrack.enabled;
     setCameraEnabled(videoTrack.enabled);
     sendMediaStateChange(videoTrack.enabled, micEnabled);
   } else {
-    // No video track: get one and add it
+    // If no video track, get one and add it
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ video: true });
       videoTrack = stream.getVideoTracks()[0];
@@ -378,6 +378,7 @@ const toggleCamera = async () => {
     }
   }
 };
+
 
 
 const toggleMicrophone = async () => {
