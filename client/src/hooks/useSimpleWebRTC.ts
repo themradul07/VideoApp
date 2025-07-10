@@ -9,8 +9,8 @@ interface Participant {
 }
 
   async function fetchXirsysIceServers(): Promise<RTCIceServer[]> {
-  const username = "muskey";
-  const secret = "382a05e2-595b-11f0-9e9e-0242ac150003";
+  const username = "themradul07";
+  const secret = "5ea51720-5d66-11f0-a9ef-0242ac150003";
   const channel = "MyFirstApp";
 
   const response = await fetch(`https://global.xirsys.net/_turn/${channel}`, {
