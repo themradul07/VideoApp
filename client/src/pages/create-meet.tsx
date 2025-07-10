@@ -132,7 +132,7 @@ export default function CreateMeet() {
         </CardContent>
       </Card>
 
-      <style jsx>{`
+      <style>{`
         .animate-fade-in {
           animation: fadeIn 0.8s ease-in-out both;
         }

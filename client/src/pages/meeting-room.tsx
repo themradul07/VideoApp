@@ -166,7 +166,7 @@ export default function MeetingRoom() {
               isLocal={true}
               cameraEnabled={cameraEnabled}
               micEnabled={micEnabled}
-              showName={true}
+             
 
             />
           </div>
@@ -186,7 +186,7 @@ export default function MeetingRoom() {
                 isLocal={false}
                 cameraEnabled={participant.cameraEnabled}
                 micEnabled={participant.micEnabled}
-                showName={true}
+            
               />
             </div>
           ))}
