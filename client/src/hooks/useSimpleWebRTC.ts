@@ -6,11 +6,12 @@ interface Participant {
   stream?: MediaStream;
   cameraEnabled?: boolean;
   micEnabled?: boolean;
+  screenEnabled?: boolean;
 }
 
   async function fetchXirsysIceServers(): Promise<RTCIceServer[]> {
-  const username = "muskey";
-  const secret = "382a05e2-595b-11f0-9e9e-0242ac150003";
+  const username = "themradul07";
+  const secret = "5ea51720-5d66-11f0-a9ef-0242ac150003";
   const channel = "MyFirstApp";
 
   const response = await fetch(`https://global.xirsys.net/_turn/${channel}`, {
@@ -23,14 +24,52 @@ interface Participant {
   });
 
   const data = await response.json();
-  // Defensive: Ensure iceServers is always an array
   let iceServers = data.v.iceServers;
   if (!Array.isArray(iceServers)) {
-    // If it's a single object, wrap it in an array
     iceServers = [iceServers];
   }
   return iceServers;
 }
+
+
+// Create a silent audio track
+function createSilentAudioTrack() {
+  const ctx = new AudioContext();
+  const oscillator = ctx.createOscillator();
+  const destination = ctx.createMediaStreamDestination();
+  oscillator.connect(destination);
+  oscillator.start();
+
+  // Stop the oscillator immediately (no sound), but the track remains
+  setTimeout(() => {
+    oscillator.stop();
+    ctx.close();
+  }, 100); // 100ms is enough to get a track, but not play a tone
+
+  const track = destination.stream.getAudioTracks()[0];
+  track.enabled = false;
+  (track as any)._isDummy = true;
+  return track;
+}
+
+
+// Create a black video track
+function createBlackVideoTrack() {
+  const canvas = document.createElement('canvas');
+  canvas.width = 640;
+  canvas.height = 480;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) throw new Error("Could not get 2D context from canvas");
+  ctx.fillStyle = 'black';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  const stream = canvas.captureStream(5);
+  const track = stream.getVideoTracks()[0];
+  track.enabled = false;
+  // Tag as dummy for easy removal later
+  (track as any)._isDummy = true;
+  return track;
+}
+
 
 
 export function useSimpleWebRTC(meetingId: string, userSettings: any) {
@@ -50,17 +89,31 @@ export function useSimpleWebRTC(meetingId: string, userSettings: any) {
   const peerConnections = useRef<Map<string, RTCPeerConnection>>(new Map());
   const isInitiator = useRef<boolean>(false);
   
-  
+  async function renegotiateAllPeers() {
+  for (const [id, pc] of Array.from(peerConnections.current.entries())) {
+    try {
+      const offer = await pc.createOffer();
+      await pc.setLocalDescription(offer);
+      if (socket && userSettings?.participantId) {
+        socket.send(JSON.stringify({
+          type: 'webrtc-offer',
+          targetId: id,
+          offer: offer
+        }));
+      }
+    } catch (e) {
+      console.error("Error renegotiating with peer", id, e);
+    }
+  }
+}
+
 
 
   function addTrackToPeers(track: MediaStreamTrack, localStream: MediaStream) {
-    // Add to local stream if not present
     if (!localStream.getTracks().find(t => t.id === track.id)) {
       localStream.addTrack(track);
     }
-    // Add to all peer connections
     peerConnections.current.forEach(pc => {
-      // Only add if not already sending this track
       const alreadySending = pc.getSenders().some(sender => sender.track && sender.track.id === track.id);
       if (!alreadySending) {
         pc.addTrack(track, localStream);
@@ -79,18 +132,27 @@ export function useSimpleWebRTC(meetingId: string, userSettings: any) {
         console.log("Fetched ICE servers:", servers);
         setIceServers(servers);
         console.log("ICE servers to use:", iceServers, Array.isArray(iceServers));
-        // Get user media
-        let stream;
-        if (userSettings.cameraEnabled !== false || userSettings.micEnabled !== false) {
-          stream = await navigator.mediaDevices.getUserMedia({
-            video: userSettings.cameraEnabled !== false,
-            audio: userSettings.micEnabled !== false
-          });
+        let tracks = [];
+
+        // Handle camera
+        if (userSettings.cameraEnabled !== false) {
+          const camStream = await navigator.mediaDevices.getUserMedia({ video: true });
+          tracks.push(...camStream.getVideoTracks());
         } else {
-          // Create an empty MediaStream if both are off
-          stream = new MediaStream();
+          tracks.push(createBlackVideoTrack());
         }
+
+        // Handle mic
+        if (userSettings.micEnabled !== false) {
+          const micStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+          tracks.push(...micStream.getAudioTracks());
+        } else {
+          tracks.push(createSilentAudioTrack());
+        }
+
+        const stream = new MediaStream(tracks);
         setLocalStream(stream);
+
         setCameraEnabled(userSettings.cameraEnabled !== false);
         setMicEnabled(userSettings.micEnabled !== false);
 
@@ -102,7 +164,6 @@ export function useSimpleWebRTC(meetingId: string, userSettings: any) {
         ws.onopen = () => {
           console.log("WebSocket connected");
           
-          // Join the meeting room
           ws.send(JSON.stringify({
             type: 'join-room',
             meetingId,
@@ -117,12 +178,10 @@ export function useSimpleWebRTC(meetingId: string, userSettings: any) {
 
         ws.onmessage = async (event) => {
           const data = JSON.parse(event.data);
-          console.log('Received message:', data);
-         
+          console.log('Received message:', data); 
 
           switch (data.type) {
             case 'participant-joined':
-              // New participant joined, initiate connection if we're already in the room
               console.log('New participant joined:', data.participant);
               if (data.participant.id !== userSettings.participantId) {
 
@@ -135,10 +194,7 @@ export function useSimpleWebRTC(meetingId: string, userSettings: any) {
               break;
 
             case 'room-participants':
-              // Existing participants in the room
               setParticipants(data.participants.filter((p: any) => p.id !== userSettings.participantId));
-              
-              // Create connections to existing participants
               for (const participant of data.participants) {
                 if (participant.id !== userSettings.participantId) {
                   await createPeerConnection(participant.id, stream, ws, false,servers);
@@ -174,7 +230,6 @@ export function useSimpleWebRTC(meetingId: string, userSettings: any) {
               break;
 
             case 'shared-screen-toogle':
-              // Handle screen sharing toggle
               console.log('Screen sharing toggle received:', data);
               setParticipants(prev =>
                 prev.map(p =>
@@ -201,7 +256,6 @@ export function useSimpleWebRTC(meetingId: string, userSettings: any) {
     initializeConnection();
 
     return () => {
-      // Cleanup
       peerConnections.current.forEach(pc => pc.close());
       peerConnections.current.clear();
       if (localStream) {
@@ -360,19 +414,62 @@ const toggleCamera = async () => {
 
   let videoTrack = localStream.getVideoTracks()[0];
 
-  if (videoTrack) {
-    // Toggle enabled property only
+  if (videoTrack && !(videoTrack as any)._isDummy) {
+    // Toggle real camera track
     videoTrack.enabled = !videoTrack.enabled;
     setCameraEnabled(videoTrack.enabled);
+
+    // Update localStorage
+    const settings = JSON.parse(localStorage.getItem('videoMeetUser') || '{}');
+    settings.cameraEnabled = videoTrack.enabled;
+    localStorage.setItem('videoMeetUser', JSON.stringify(settings));
     sendMediaStateChange(videoTrack.enabled, micEnabled);
-  } else {
-    // If no video track, get one and add it
+
+  } else if (videoTrack && (videoTrack as any)._isDummy) {
+    // Remove dummy black track
+    localStream.removeTrack(videoTrack);
+    peerConnections.current.forEach(pc => {
+      const sender = pc.getSenders().find(s => s.track === videoTrack);
+      if (sender) pc.removeTrack(sender);
+    });
+    // Now get real camera and add
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ video: true });
-      videoTrack = stream.getVideoTracks()[0];
-      addTrackToPeers(videoTrack, localStream);
+      const realTrack = stream.getVideoTracks()[0];
+      localStream.addTrack(realTrack);
+      peerConnections.current.forEach(pc => {
+        pc.addTrack(realTrack, localStream);
+      });
+      await renegotiateAllPeers();
       setCameraEnabled(true);
+
+      // Update localStorage
+      const settings = JSON.parse(localStorage.getItem('videoMeetUser') || '{}');
+      settings.cameraEnabled = true;
+      localStorage.setItem('videoMeetUser', JSON.stringify(settings));
       sendMediaStateChange(true, micEnabled);
+
+    } catch (err) {
+      console.error("Error enabling camera:", err);
+    }
+
+  } else {
+    // No video track at all, just add real camera
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+      const realTrack = stream.getVideoTracks()[0];
+      localStream.addTrack(realTrack);
+      peerConnections.current.forEach(pc => {
+        pc.addTrack(realTrack, localStream);
+      });
+      setCameraEnabled(true);
+
+      // Update localStorage
+      const settings = JSON.parse(localStorage.getItem('videoMeetUser') || '{}');
+      settings.cameraEnabled = true;
+      localStorage.setItem('videoMeetUser', JSON.stringify(settings));
+      sendMediaStateChange(true, micEnabled);
+
     } catch (err) {
       console.error("Error enabling camera:", err);
     }
@@ -381,22 +478,83 @@ const toggleCamera = async () => {
 
 
 
+
 const toggleMicrophone = async () => {
   if (!localStream) return;
 
   let audioTrack = localStream.getAudioTracks()[0];
 
-  if (audioTrack) {
+  if (audioTrack && !(audioTrack as any)._isDummy) {
+    // Toggle real mic track
     audioTrack.enabled = !audioTrack.enabled;
     setMicEnabled(audioTrack.enabled);
+
+    // If disabling, remove real track and add dummy
+    if (!audioTrack.enabled) {
+      localStream.removeTrack(audioTrack);
+      peerConnections.current.forEach(pc => {
+        const sender = pc.getSenders().find(s => s.track === audioTrack);
+        if (sender) pc.removeTrack(sender);
+      });
+      // Add dummy silent track
+      const dummyTrack = createSilentAudioTrack();
+      localStream.addTrack(dummyTrack);
+      peerConnections.current.forEach(pc => {
+        pc.addTrack(dummyTrack, localStream);
+      });
+      await renegotiateAllPeers();
+    }
+
+    // Update localStorage
+    const settings = JSON.parse(localStorage.getItem('videoMeetUser') || '{}');
+    settings.micEnabled = audioTrack.enabled;
+    localStorage.setItem('videoMeetUser', JSON.stringify(settings));
     sendMediaStateChange(cameraEnabled, audioTrack.enabled);
-  } else {
+
+  } else if (audioTrack && (audioTrack as any)._isDummy) {
+    // Remove dummy audio track
+    localStream.removeTrack(audioTrack);
+    peerConnections.current.forEach(pc => {
+      const sender = pc.getSenders().find(s => s.track === audioTrack);
+      if (sender) pc.removeTrack(sender);
+    });
+    // Now get real mic and add
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      audioTrack = stream.getAudioTracks()[0];
-      addTrackToPeers(audioTrack, localStream);
+      const realTrack = stream.getAudioTracks()[0];
+      localStream.addTrack(realTrack);
+      peerConnections.current.forEach(pc => {
+        pc.addTrack(realTrack, localStream);
+      });
+      await renegotiateAllPeers();
       setMicEnabled(true);
+
+      // Update localStorage
+      const settings = JSON.parse(localStorage.getItem('videoMeetUser') || '{}');
+      settings.micEnabled = true;
+      localStorage.setItem('videoMeetUser', JSON.stringify(settings));
       sendMediaStateChange(cameraEnabled, true);
+
+    } catch (err) {
+      console.error("Error enabling mic:", err);
+    }
+  } else {
+    // No audio track at all, just add real mic
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const realTrack = stream.getAudioTracks()[0];
+      localStream.addTrack(realTrack);
+      peerConnections.current.forEach(pc => {
+        pc.addTrack(realTrack, localStream);
+      });
+      setMicEnabled(true);
+
+      // Update localStorage
+      const settings = JSON.parse(localStorage.getItem('videoMeetUser') || '{}');
+      settings.micEnabled = true;
+      localStorage.setItem('videoMeetUser', JSON.stringify(settings));
+      sendMediaStateChange(cameraEnabled, true);
+
     } catch (err) {
       console.error("Error enabling mic:", err);
     }
@@ -405,7 +563,6 @@ const toggleMicrophone = async () => {
 
 
   const endCall = () => {
-    // 1. Notify server and others
     if (socket && userSettings?.participantId) {
       socket.send(JSON.stringify({
         type: 'leave-room',
@@ -413,21 +570,15 @@ const toggleMicrophone = async () => {
         participantId: userSettings.participantId,
       }));
     }
-
-    // 2. Stop local media
     if (localStream) {
       localStream.getTracks().forEach(track => track.stop());
     }
     setLocalStream(null);
-
-    // 3. Close all peer connections
     peerConnections.current.forEach(pc => pc.close());
     peerConnections.current.clear();
 
-    // 4. Clear participants
     setParticipants([]);
 
-    // 5. Optionally close socket after a short delay to ensure message is sent
     setTimeout(() => {
       if (socket) {
         socket.close();
@@ -436,16 +587,12 @@ const toggleMicrophone = async () => {
   };
 
 
-
-  // Start screen sharing
 const startScreenShare = async () => {
   try {
     const displayStream = await navigator.mediaDevices.getDisplayMedia({ video: true });
     setScreenStream(displayStream);
     setIsScreenSharing(true);
-    
 
-    // Replace the video track in all peer connections
     const screenTrack = displayStream.getVideoTracks()[0];
     peerConnections.current.forEach((pc) => {
       const senders = pc.getSenders().filter(s => s.track && s.track.kind === 'video');
@@ -453,8 +600,6 @@ const startScreenShare = async () => {
         senders[0].replaceTrack(screenTrack);
       }
     });
-
-    // Replace local video track for local preview
     setLocalStream((prev) => {
       if (!prev) return prev;
       const newStream = new MediaStream([
@@ -464,7 +609,6 @@ const startScreenShare = async () => {
       return newStream;
     });
 
-    // When user stops sharing from browser UI
     screenTrack.onended = () => {
       stopScreenShare();
     };
@@ -483,7 +627,6 @@ const startScreenShare = async () => {
   }
 };
 
-// Stop screen sharing and revert to camera
 const stopScreenShare = async () => {
   if (screenStream) {
     screenStream.getTracks().forEach(track => track.stop());
@@ -491,13 +634,11 @@ const stopScreenShare = async () => {
   }
   setIsScreenSharing(false);
 
-  // Get camera again
   const cameraStream = await navigator.mediaDevices.getUserMedia({
     video: cameraEnabled,
     audio: micEnabled,
   });
 
-  // Replace the video track in all peer connections
   const cameraTrack = cameraStream.getVideoTracks()[0];
   peerConnections.current.forEach((pc) => {
     const senders = pc.getSenders().filter(s => s.track && s.track.kind === 'video');
@@ -505,10 +646,7 @@ const stopScreenShare = async () => {
       senders[0].replaceTrack(cameraTrack);
     }
   });
-
-  // Update local stream for preview
   setLocalStream(cameraStream);
-   //update th backend as well
     if(socket){
       socket.send(JSON.stringify({
         type: 'shared-screen',
@@ -518,8 +656,6 @@ const stopScreenShare = async () => {
     }
 
 };
-
-
   return {
     localStream,
     participants,
@@ -533,14 +669,3 @@ const stopScreenShare = async () => {
     stopScreenShare,
   };
 }
-
-
-
-
-
-
-
-
-
-
-

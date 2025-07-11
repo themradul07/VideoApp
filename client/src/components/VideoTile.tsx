@@ -18,7 +18,9 @@ export default function VideoTile({
 }: VideoTileProps) {
   const [ishovered, setishovered] = useState(false)
   const videoRef = useRef<HTMLVideoElement>(null);
+  const audioRef = useRef<HTMLAudioElement>(null);
 
+  // VIDEO useEffect (as you have it)
   useEffect(() => {
     if (videoRef.current && stream && cameraEnabled && stream.getVideoTracks().length > 0) {
       videoRef.current.srcObject = stream;
@@ -27,6 +29,17 @@ export default function VideoTile({
       videoRef.current.srcObject = null;
     }
   }, [stream, cameraEnabled]);
+
+  // AUDIO useEffect (NEW)
+  useEffect(() => {
+    if (audioRef.current && stream && micEnabled && stream.getAudioTracks().length > 0) {
+      audioRef.current.srcObject = stream;
+      audioRef.current.muted = isLocal;
+      audioRef.current.play().catch(() => {});
+    } else if (audioRef.current) {
+      audioRef.current.srcObject = null;
+    }
+  }, [stream, micEnabled, isLocal]);
 
 
   const getInitials = (name: string) => {
@@ -39,13 +52,7 @@ export default function VideoTile({
       if (videoRef.current.requestFullscreen) {
         videoRef.current.requestFullscreen();
       }
-      // } else if (videoRef.current.mozRequestFullScreen) { /* Firefox */
-      //   videoRef.current.mozRequestFullScreen();
-      // } else if (videoRef.current.webkitRequestFullscreen) { /* Chrome, Safari & Opera */
-      //   videoRef.current.webkitRequestFullscreen();
-      // } else if (videoRef.current.msRequestFullscreen) { /* IE/Edge */
-      //   videoRef.current.msRequestFullscreen();
-      // }
+      
     }
   };
 
@@ -74,6 +81,7 @@ export default function VideoTile({
 
   return (
     <div onClick={handleClick} className="relative bg-gray-800 rounded-lg overflow-hidden aspect-video border border-gray-700/50 min-h-0 md:min-h-[200px]">
+        <audio ref={audioRef} autoPlay />
       {stream && cameraEnabled ? (
         <video
           ref={videoRef}
